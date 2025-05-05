@@ -6,7 +6,6 @@ Created on Tue Mar 18 08:39:21 2025
 @author: gliu
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -24,12 +23,9 @@ import os
 import tqdm
 import time
 
-#from cmcrameri import cm
-
 #%%
 
-# local device
-
+# local device (currently set to run on Astraeus, customize later)
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
@@ -74,21 +70,50 @@ proj        = ccrs.PlateCarree()
 #%% Load some other things to plot
 
 
-# Load Sea Ice Masks
-dpath_ice = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-nc_masks = dpath_ice + "OISST_ice_masks_1981_2020.nc"
-ds_masks = xr.open_dataset(nc_masks).load()
+# # Load Sea Ice Masks
+# dpath_ice = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+# nc_masks = dpath_ice + "OISST_ice_masks_1981_2020.nc"
+# ds_masks = xr.open_dataset(nc_masks).load()
 
 # Load AVISO
-dpath_aviso = dpath_ice + "proc/"
-nc_adt = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
-ds_adt = xr.open_dataset(nc_adt).load()
-cints_adt = np.arange(-100, 110, 10)
+dpath_aviso     = dpath_ice + "proc/"
+nc_adt          = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
+ds_adt          = xr.open_dataset(nc_adt).load()
+cints_adt       = np.arange(-100, 110, 10)
 
-#%% Set some paths
+#%% Further User Edits (Set Paths, Load other Data)
 
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20250318/"
+# Set Paths
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20250318/"
+sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 
+# Indicate Observations
+append_obs      = True
+dpath_obs       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+ncname_obs      = "ERA5_sst_NAtl_1979to2024.nc" 
+obsname         = "ERA5"
+obsname_long    = "ERA5 Reanalysis (1979-2024)"
+
+# Indicate Experiment and Comparison Name 
+comparename     = "paperoutline"
+expnames        = ["SST_Obs_Pilot_00_Tdcorr0_qnet","SST_Obs_Pilot_00_Tdcorr1_qnet","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (with re-emergence)","Stochastic Model","ERA5"]
+expcols         = ["turquoise","goldenrod","k"]
+expls           = ["dotted","dashed",'solid']
+
+
+
+#%% Load stochastic model output
+
+
+
+
+#%% Load and append Observational set
+
+# if append_obs:
+#     # Load ERA5
+#     ncera           = dpath_era + 
+#     dsera           = xr.open_dataset(ncera).load().sst
 
 #%% Load the data
 # Load stochastic model data (1kyr run, Td Mistake)
@@ -98,7 +123,7 @@ figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/0
 
 # Load stochastic model data (1kyr run, with entrainment forcing) -------------
 
-sm_output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
+
 
 splitrun    = False
 # <Option 1> Load 2 500yr runs for SPG subregion -
@@ -130,10 +155,7 @@ dpath_sm3  = sm_output_path + "SST_Obs_Pilot_00_TdCorr0_qnet/Output/"
 ncsm3      = dpath_sm3 + "SST_runidrun00.nc"
 dssm3      = xr.open_dataset(ncsm3).load().SST
 
-# Load ERA5
-dpath_era   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-ncera       = dpath_era + "ERA5_sst_NAtl_1979to2024.nc" #"ERA5_sst_NAtl_1979to2021.nc"
-dsera       = xr.open_dataset(ncera).load().sst
+
 
 #%% (1) Anomalize and preprocess ---------------------------------------------
 
@@ -754,6 +776,9 @@ for ilag in range(60):
 
 
 #%%
+
+
+
 
 
 
