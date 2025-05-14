@@ -47,8 +47,6 @@ import scm
 import amv.loaders as dl
 import cvd_utils as cvd
 
-
-
 #%% Plotting Inputs
 
 # Set Plotting Options
@@ -126,7 +124,9 @@ bbsel   = [-40,-15,52,62]
 locfn,locstring = proc.make_locstring_bbox(bbsel,lon360=True)
 bbfn    = "%s_%s" % (regname,locfn)
 
-
+detrend_obs_regression = True
+dpath_gmsst     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst        = "ERA5_GMSST_1979_2024.nc"
 
 # Indicate Experiment and Comparison Name 
 
@@ -168,15 +168,40 @@ for ex in tqdm.tqdm(range(nexps)):
     expname = expnames[ex]
     ncname  = "%s%s/Metrics/Area_Avg_%s.nc" % (sm_output_path,expname,bbfn)
     
+
+    
     ds      = xr.open_dataset(ncname).load()
     dsall.append(ds)
-    
+
     
 #%% Preprocessing
 
-dsa   = [proc.xrdeseason(ds) for ds in dsall]
-ssts  = [sp.signal.detrend(ds.SST.data) for ds in dsa]
+dsa      = [proc.xrdeseason(ds) for ds in dsall]
+ssts     = [sp.signal.detrend(ds.SST.data) for ds in dsa]
 ssts_ds  = [proc.xrdetrend(ds.SST) for ds in dsa]
+
+#%% Detrend ERA5 using Global Mean Regression Approach
+if (detrend_obs_regression):
+    
+    # 
+    sst_era = dsa[-1].SST
+    sst_era = sst_era.expand_dims(dim=dict(lon=1,lat=1))
+    
+    # Add dummy lat lon
+    #sst_era['lon'] = 1
+    #sst_era['lat'] = 1
+    
+    # Load GMSST
+    ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
+    dsdtera5     = proc.detrend_by_regression(sst_era,ds_gmsst)
+    
+    sst_era_dt = dsdtera5.SST.squeeze()
+    
+    ssts_ds[-1] = sst_era_dt
+    ssts[-1] = sst_era_dt.data
+    #print("\nSkipping ERA5, loading separately")
+
+
 
 #%% Compute basic metrics
 
@@ -195,6 +220,8 @@ vratio   = (stds_lp  / stds) * 100
 #%%
 kmonth = 1
 xtks   = lags[::6]
+conf   = 0.95
+
 
 for kmonth in range(12):
     fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
@@ -205,10 +232,23 @@ for kmonth in range(12):
         plotvar = metrics_out['acfs'][kmonth][ex]
         ax.plot(lags,plotvar,
                 label=expnames_long[ex],color=expcols[ex],ls=expls[ex],lw=2.5)
+        
+        
+        # Calcualate Confidence Interval
+        #neff  = proc.calc_dof()
+        
+        cflag = proc.calc_conflag(plotvar,conf,2,len(ssts[ex])/12)
+        if ex == 2:
+            alpha = 0.05
+        else:
+            alpha = 0.15
+        ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=expcols[ex],zorder=3)
+        
     ax.legend()
     
-    ax.set_title("%s SST Autocorrelation" % mons3[kmonth])
-    ax.set_xlabel("Lag (Months)")
+    ax.set_title("")
+    #ax.set_title("%s SST Autocorrelation" % mons3[kmonth])
+    ax.set_xlabel("Lag from %s (Months)" % mons3[kmonth])
     ax.set_ylabel("Correlation with %s. Anomalies" % (mons3[kmonth]))
     
     
@@ -309,16 +349,17 @@ for ex in range(nexps):
 
 #%% Make Barplot
 
+expcols_bar     = np.array(expcols).copy()
+expcols_bar[-1] = 'gray'
 
-instd       = stds
-instd_lp    = stds_lp
+instd           = stds
+instd_lp        = stds_lp
 
-xlabs       = ["%s\n%.2f" % (expnames_short[ii],vratio[ii])+"%" for ii in range(len(vratio))]
-fig,ax      = plt.subplots(1,1,constrained_layout=True,figsize=(6,6))
+xlabs           = ["%s\n%.2f" % (expnames_long[ii],vratio[ii])+"%" for ii in range(len(vratio))]
+fig,ax          = plt.subplots(1,1,constrained_layout=True,figsize=(6,6))
 
-
-braw        = ax.bar(np.arange(nexps),instd,color='gray')
-blp         = ax.bar(np.arange(nexps),instd_lp,color='k')
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
+blp             = ax.bar(np.arange(nexps),instd_lp,color='k')
 
 ax.bar_label(braw,fmt="%.04f",c='gray')
 ax.bar_label(blp,fmt="%.04f",c='k')
@@ -328,7 +369,6 @@ ax.bar_label(blp,fmt="%.04f",c='k')
 ax.set_xticks(np.arange(nexps),labels=xlabs)
 ax.set_ylabel("$\sigma$(SST) [$\degree$C]")
 ax.set_ylim([0,1.0])
-
 
 #%% Do F-test
 

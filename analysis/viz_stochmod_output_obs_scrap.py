@@ -71,18 +71,18 @@ proj        = ccrs.PlateCarree()
 
 #%% Load some other things to plot
 
-
 # # Load Sea Ice Masks
-dpath_ice = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-nc_masks = dpath_ice + "OISST_ice_masks_1981_2020.nc"
-ds_masks = xr.open_dataset(nc_masks).load()
+dpath_ice   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+nc_masks    = dpath_ice + "OISST_ice_masks_1981_2020.nc"
+ds_masks    = xr.open_dataset(nc_masks).load()
+ds_ice_era5 = dl.load_mask("ERA5").mask
+dsice_era5_plot = xr.where(np.isnan(ds_ice_era5),0,1)
 
 # Load AVISO
-dpath_aviso     = dpath_ice + "proc/"
-nc_adt          = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
-ds_adt          = xr.open_dataset(nc_adt).load()
-cints_adt       = np.arange(-100, 110, 10)
-
+dpath_aviso = dpath_ice + "proc/"
+nc_adt      = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
+ds_adt      = xr.open_dataset(nc_adt).load()
+cints_adt   = np.arange(-100, 110, 10)
 
 # Make a plotting function
 def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
@@ -90,7 +90,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
     ax = plt.gca()
     
     # # Plot Sea Ice
-    plotvar = ds_masks.mask_mon
+    plotvar = dsice_era5_plot#ds_masks.mask_mon
     cl = ax.contour(plotvar.lon, plotvar.lat,
                     plotvar, colors="cyan",
                     linewidths=2, transform=proj, levels=[0, 1], zorder=1)
@@ -116,6 +116,10 @@ dpath_obs       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdam
 ncname_obs      = "ERA5_sst_NAtl_1979to2024.nc" 
 obsname         = "ERA5"
 obsname_long    = "ERA5 Reanalysis (1979-2024)"
+
+detrend_obs_regression = True
+dpath_gmsst     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst        = "ERA5_GMSST_1979_2024.nc"
 
 # Indicate Experiment and Comparison Name 
 
@@ -158,12 +162,16 @@ nexps  = len(expnames)
 for ex in range(nexps):
     
     expname = expnames[ex]
+    if (detrend_obs_regression) and ("ERA5" in expname):
+        print("Skipping ERA5, loading separately")
+        continue
     print("Loading output for %s" % expname)    
     
     # Note: Only loads the first run...
     ds = dl.load_smoutput(expname,sm_output_path,runids=[0,])
     ds_all.append(ds)
 print("Loaded all output in %.2fs" % (time.time()-st))
+
 
 #%% Anomalize and preprocess
 
@@ -173,6 +181,20 @@ sstas   = [proc.xrdeseason(ds) for ds in in_ssts]
 sstasdt = [proc.xrdetrend(ds) for ds in sstas]
 print("Completed preprocessing in %.2fs" % (time.time()-st))
 
+#%% Load ERA5 separately, if option is set
+
+if detrend_obs_regression:
+    ds_era5      = xr.open_dataset(dpath_obs + ncname_obs).sst.load()
+    ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
+    
+    # Deseasonalize
+    ssta_era5    = proc.xrdeseason(ds_era5)
+    # Remove Trend
+    dsdtera5     = proc.detrend_by_regression(ssta_era5,ds_gmsst)
+    ssta_dt_era5 = dsdtera5.sst
+    
+    sstasdt.append(ssta_dt_era5)
+
 #%% Some Basinwide Plots...
 
 # Set Plotting Parameters
@@ -180,9 +202,7 @@ fsz_title = 24
 fsz_axis  = 22
 fsz_ticks = 20
 
-
-#%%
-#% Plot Stdev for each simulation
+#%% Plot Stdev for each simulation
 
 for ex in range(nexps):
     
@@ -337,7 +357,6 @@ for ex in range(nexps):
     
     savename = "%sACFMap_%s_%s.png" % (figpath,comparename,expnames[ex])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
-
 
 #%% TRying to add lines along feb (need to deal with this further)
 
@@ -1042,6 +1061,7 @@ for ilag in range(60):
         
         ax.plot(lags[ilag],plotvar[ilag],c=expcols[ii],marker="o",
                 markerfacecolor='None',markersize=15)
+    
     
     
     
