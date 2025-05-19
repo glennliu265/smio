@@ -7,6 +7,7 @@ Compute Qnet in ERA5 reanalysis
 Works with output downloaded using Copernicus CDI, and placed
 into stormtrack in data4/ (see dpath)
 
+Seems that values are positive into the ocean by default for ERA5
 
 Created on Tue Mar 25 14:36:37 2025
 
@@ -32,6 +33,18 @@ sys.path.append(scmpath)
 from amv import proc,viz
 import scm
 import amv.loaders as dl
+
+#%% User Edits/Options
+
+#calc_qnet  = True
+calc_rhflx = True
+calc_thflx = True
+
+# Paths
+
+# Path to the output
+outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/data/NATL_proc_obs/proc/"
+
 
 #%%
 
@@ -85,17 +98,20 @@ plt.show()
 
 
 """
+
 Note. Checking the winter values, it seems that all values are positive into the ocean 
 
 (i.e. SLHF, SSHF, and STR are all negative in winter, while
  SSR is positive)
+
 """
 
 #%% Compute a few values
-# Start with qnet
 
+# Convert units to per second
 da_all  = xr.merge([ds_all_natl[vv][vnames[vv]]/dtdaily for vv in range(4)])
 
+#%% Start with qnet
 flxes   = [da_all[vnames[vv]].data for vv in range(4)]
 qnet    = np.stack(flxes).sum(0)
 ds      = da_all[vnames[0]]
@@ -115,6 +131,36 @@ da_qnet.to_netcdf(ncname,encoding=edict)
 edict   = proc.make_encoding_dict(da_all)
 ncname  = outpath + "ERA5_All_Fluxes_NAtl_1979to2024.nc"
 da_all.to_netcdf(ncname,encoding=edict)
+
+#%% Reload and compute Radiative and Turbulent heat fluxes
+
+# Reload all fluxes
+ncname          = outpath + "ERA5_All_Fluxes_NAtl_1979to2024.nc"
+ds_allflx       = xr.open_dataset(ncname).load()
+
+# Compute Additional fluxes (Positive Into Ocean)
+if compute_rhflx:
+    
+    rhflx    = ds_allflx.ssr + ds_allflx.str
+    rhflx    = rhflx.rename('rhflx')
+    edict    = proc.make_encoding_dict(rhflx)
+    outname  = outpath + "ERA5_rhflx_NAtl_1979_2024.nc"
+    rhflx.to_netcdf(outname,encoding=edict)
+    print("Saved RHFLX to %s" % outname)
+    
+    
+if compute_thflx:
+    
+    thflx    = ds_allflx.sshf + ds_allflx.slhf
+    thflx    = thflx.rename('thflx')
+    edict    = proc.make_encoding_dict(thflx)
+    outname  = outpath + "ERA5_thflx_NAtl_1979_2024.nc"
+    thflx.to_netcdf(outname,encoding=edict)
+    print("Saved THFLX to %s" % outname)
+    
+
+
+
 
 # ============================================================================
 #%% Reload and Save SST
