@@ -96,6 +96,11 @@ for ex in range(nexps):
         ds = ds - 273.15
     if "ERA5" not in expnames[ex]:
         ds = proc.fix_febstart(ds)
+        
+    if "SOM" in expnames[ex]:
+            
+        print("Dropping first 60 years for SLAB simulation")
+        ds = ds.sel(time=slice('0060-02-01','0361-01-01'))
     ssts.append(ds.copy())
     
     # # Load Fluxes
@@ -161,13 +166,13 @@ def preproc_ds(ds):
     dsadt = proc.xrdetrend(dsa)
     return dsadt
 
-flxas = [preproc_ds(ds) for ds in flxs]
+#flxas = [preproc_ds(ds) for ds in flxs]
 sstas = [preproc_ds(ds.squeeze()) for ds in ssts]
 
 cutoff   = 5*12
 nyrs     = int(cutoff/12)
 
-flxas_lp = [proc.lp_butter(ds,cutoff,6) for ds in flxas]
+#flxas_lp = [proc.lp_butter(ds,cutoff,6) for ds in flxas]
 sstas_lp = [proc.lp_butter(ds,cutoff,6) for ds in sstas]
 
 
@@ -272,12 +277,11 @@ ax.set_ylabel("$\sigma$(SST) [$\degree$C]")
 ax.set_ylim([0,1.0])
 
 #%% Calculate Metrics
-ssts         = [ds.data for ds in sstas]
-lags         = np.arange(61)
-nsmooths     = [4,250,100,100]
-metrics_out  = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags)
 
-
+ssts          = [ds.data for ds in sstas]
+lags          = np.arange(61)
+nsmooths      = [4,250,100,100]
+metrics_out   = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags)
 expnames_long = expnames
 
 #%% Plot Spectra
@@ -336,7 +340,6 @@ invar        = sstas[1].data
 #     ts = np.std(ts)
 #     return 
 
-
 def mciter_stdev(ntime_sample,invar,niter,return_idx=False):
     ntime         = len(invar)
     nstarts       = np.arange(ntime-ntime_sample+1)
@@ -374,20 +377,18 @@ def get_conf(samples,alpha=0.05,mu=None):
     return lower_bnd,upper_bnd
     
     
-    
-    
 
 #%%
 st = time.time()
-stds_distr    = [mciter_stdev(ntime_sample,sst,10000) for sst in sstas[1:]]
-stds_distr_lp = [mciter_stdev(ntime_sample,sst,10000) for sst in sstas_lp[1:]]
+stds_distr       = [mciter_stdev(ntime_sample,sst,10000) for sst in sstas[1:]]
+stds_distr_lp    = [mciter_stdev(ntime_sample,sst,10000) for sst in sstas_lp[1:]]
 
 confs_val         = np.array([get_conf(ss) for ss in stds_distr])
 confs_val_lp      = np.array([get_conf(ss) for ss in stds_distr_lp])
 
 
-confs         = np.array([get_conf(stds_distr[ii],mu=stds[ii+1]) for ii in range(3)])
-confs_lp      = np.array([get_conf(stds_distr_lp[ii],mu=stds_lp[ii+1]) for  ii in range(3)])
+confs            = np.array([get_conf(stds_distr[ii],mu=stds[ii+1]) for ii in range(3)])
+confs_lp         = np.array([get_conf(stds_distr_lp[ii],mu=stds_lp[ii+1]) for  ii in range(3)])
 
 # Set up confs
 # confs       = (confs - stds[1:,None]).T
@@ -398,7 +399,7 @@ confs_lp      = np.array([get_conf(stds_distr_lp[ii],mu=stds_lp[ii+1]) for  ii i
 titles  = ["1$\sigma$","1$\sigma$ (LP-Filtered)"]
 
 
-mcex     = 2
+mcex     = 0
 ex       = mcex + 1 # Add 1 since ERA5 was skipped
 nbins  = 25
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,8))
@@ -444,7 +445,7 @@ mu = np.nanmean(insample)
 ax.axvline(mu,c='firebrick',ls='solid',label="Sample Mean: %.2f" % mu)
 
 # Plot Actual Value
-plotstd = stds[ex]
+plotstd = stds_lp[ex]
 ax.axvline(plotstd,c='orange',ls='solid',label="Actual Value: %.2f" % plotstd)
 
 
