@@ -94,7 +94,7 @@ proc.makedir(outpathbb)
 # Indicate Other Paths
 procpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 smoutput_path   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20250423/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250523/"
 proc.makedir(figpath)
 
 # Indicate Experiment and Comparison Name 
@@ -226,7 +226,7 @@ else:
         #edict   = proc.make_encoding_dict(dsout)
         #dsout.to_netcdf(outname,encoding=edict)
     
-#%% plot detrended timeseries
+#%% Plot detrended timeseries
 ssts_arr    = [ds.data for ds in ssts_reg]
 
 era_sst   = ssts_arr[-1]
@@ -238,8 +238,16 @@ for nn in range(2):
     
     sst_in = ssts_arr[nn]
     
+    
+
+
+        
+    
+
+    
 #%% Plot timeseries
 
+istart     = 12 #None # If None, just plot last n timesteps
 fsz_legend = 14
 fsz_axis   = 18
 fsz_ticks  = 14
@@ -255,18 +263,25 @@ plotint    = 36
 times_sm   = ssts_reg[0].time.data[-ntime_era:]
 years_sm   = [str(t)[:4] for t in times_sm]
 
+# Initialize Fig
 fig,axs    = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
 
+# Plot Era
 ax         = axs[0]
 ax.plot(era_sst,label=expnames[-1],c=expcols[-1])
 
 
-
+# Plot SM
 ax = axs[1]
-ax.plot(ssts_arr[0][-ntime_era:],label=expnames_long[0],c=expcols[0])
-ax.plot(ssts_arr[1][-ntime_era:],label=expnames_long[1],c=expcols[1])
+if istart is None:
+    ax.plot(ssts_arr[0][-ntime_era:],label=expnames_long[0],c=expcols[0])
+    ax.plot(ssts_arr[1][-ntime_era:],label=expnames_long[1],c=expcols[1])
+else:
+    ax.plot(ssts_arr[0][istart:istart+ntime_era],label=expnames_long[0],c=expcols[0])
+    ax.plot(ssts_arr[1][istart:istart+ntime_era],label=expnames_long[1],c=expcols[1])
 ax.legend(fontsize=fsz_legend)
 
+# Label Axes
 for ax in axs:
     ax.legend(fontsize=fsz_legend)
     ax.set_xlim(xlims)
@@ -279,9 +294,101 @@ ax.set_xticks(xplot[::plotint],labels=years[::plotint])
 
 ax = axs[1]
 ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
+
+
+figname = "%sSST_SM_ERA5_Timeseries_Comparison_istart%05i.png" % (figpath,comparename,istart,)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% Find time with the best fit
+
+lpcutoff  = 120
+ntime_sm  = len(ssts_arr[0])
+
+nsegments = ntime_sm - ntime_era
+rmse_all  = np.zeros((2,nsegments)) * np.nan
+for ii in tqdm.tqdm(range(nsegments)):
+    idxin = np.arange(ii,ii+ntime_era)
+    
+    for ex in range(2):
+        
+        sstin            = ssts_arr[ex][idxin]
+        sstref           = ssts_arr[-1]
+        if lpcutoff is not None:
+            sstin = proc.lp_butter(sstin,lpcutoff,6)
+            sstref = proc.lp_butter(sstref,lpcutoff,6)
+        
+        rmse_all[ex,ii]  = np.sqrt(np.nanmean(sstin - sstref)**2)
+        
+#%%% Plot time with the smallest value
+fig,ax = plt.subplots(1,1,figsize=(12.5,4.5))
+
+imins  = []
+istart = np.arange(nsegments) 
+for ex in range(2):
+    #rmsein = rmse_all[ex,:]
+    rmsein = proc.lp_butter(rmse_all[ex,:],12,6)
+    ax.plot(istart,rmsein,label=expnames_long[ex],c=expcols[ex])
+    
+    imin = np.nanargmin(rmsein)
+    ax.plot(imin,rmsein[imin],marker="d",c="k",label="istart=%i" % (imin))
+    
+    imins.append(imin)
     
     
-    
+ax.legend()
+
+#%% Plot resulting timeseries
+
+label_actual_year = True
+ylims             = [-2,2]
+
+# Initialize Fig
+fig,axs           = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
+
+# Plot Era
+ax         = axs[0]
+ax.plot(era_sst,label=expnames_long[-1],c=expcols[-1])
+
+era_lp  = proc.lp_butter(era_sst,120,6)
+
+#from : https://stackoverflow.com/questions/64068659/bar-chart-in-matplotlib-using-a-colormap
+# cmapin  = plt.get_cmap("RdBu_r")
+# rescale = lambda y: (y - np.min(y)) / (np.max(y) - np.min(y))
+# ax.bar(xplot,era_lp,color=cmapin(rescale(era_lp)),edgecolor="w")
+
+
+if label_actual_year:
+    times_sm   = ssts_reg[0].time.data[imins[1]:imins[1]+ntime_era]
+else:
+    times_sm   = ssts_reg[0].time.data[:ntime_era]
+years_sm   = [str(t)[:4] for t in times_sm]
+
+
+# Plot SM
+ax = axs[1]
+ax.plot(ssts_arr[0][imins[1]:imins[1]+ntime_era],label=expnames_long[0],c=expcols[0])
+ax.plot(ssts_arr[1][imins[1]:imins[1]+ntime_era],label=expnames_long[1],c=expcols[1])
+ax.legend(fontsize=fsz_legend)
+
+# Label Axes
+for ax in axs:
+    ax.legend(fontsize=fsz_legend)
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+    ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
+    ax.axhline([0],ls='dotted',c='k',lw=0.75)
+    ax.tick_params(labelsize=fsz_ticks)
+ax = axs[0]
+ax.set_xticks(xplot[::plotint],labels=years[::plotint])
+
+ax = axs[1]
+ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
+
+
+figname = "%sSST_SM_ERA5_Timeseries_Comparison_%s_istart%05i_lpf%02i.png" % (figpath,comparename,imins[1],lpcutoff)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
 
 #%% Compute Metrics for each case
 
