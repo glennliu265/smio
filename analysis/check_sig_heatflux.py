@@ -244,21 +244,21 @@ for im in range(12):
         plotvar = ds_mld.max('mon')
     else:
         
-        # Plot the SSH
-        cints_adt2 = np.arange(-200,205,5)
-        plotvar = ds_adt.isel(time=im)#('time')
-        cl = ax.contour(plotvar.lon, plotvar.lat, plotvar.adt*100, colors="k",alpha=0.8,
-                        linewidths=0.75, transform=proj, levels=cints_adt2)
+        # # Plot the SSH
+        # cints_adt2 = np.arange(-200,205,5)
+        # plotvar = ds_adt.isel(time=im)#('time')
+        # cl = ax.contour(plotvar.lon, plotvar.lat, plotvar.adt*100, colors="k",alpha=0.8,
+        #                 linewidths=0.75, transform=proj, levels=cints_adt2)
             
             
         # Plot Mixed-layer depth
         plotvar = ds_mld.isel(mon=im)
     
-    # # Plot Mixed-layer depth
-    # clmld = ax.contour(plotvar.lon,plotvar.lat,plotvar,linewidths=0.75,
-    #                    levels=cints_mld,transform=proj,colors='navy')
+    # Plot Mixed-layer depth
+    clmld = ax.contour(plotvar.lon,plotvar.lat,plotvar,linewidths=0.75,
+                        levels=cints_mld,transform=proj,colors='dimgray')
     
-    # ax.clabel(clmld)
+    ax.clabel(clmld)
     # lonf = -49
     # latf = -60
     # ax.plot(lonf,latf,marker="x",c='black',
@@ -276,7 +276,7 @@ for im in range(12):
         figname = "%sHFF_Check_SPGNE_ERA5_%s_%s_monMIN_lag%i.png" % (figpath,flxname,signame,ilag+1)
     else:
         title = "ERA5 %s Heat Flux Feedback, Lag %02i\n%s" % (mons3[im],ilag+1,ptcount)
-        figname = "%sHFF_Check_SPGNE_ERA5_%s_%s_mon%02i_lag%i.png" % (figpath,flxname,signame,im+1,ilag+1)
+        figname = "%sHFF_Check_SPGNE_ERA5_%s_%s_mon%02i_lag%i_mld.png" % (figpath,flxname,signame,im+1,ilag+1)
     ax.set_title(title,fontsize=fsz_title)
     
     
@@ -286,17 +286,9 @@ for im in range(12):
 #%% Compute the P-Value, and plot it as contour lines (with HFF)
 
 
-ilag = 0
-im   = 1
-
-rho = rflx.isel(lag=ilag,month=im).data
-
-def calc_pval_rho(rho,dof):
-    # From https://stats.libretexts.org/Bookshelves/Introductory_Statistics/Mostly_Harmless_Statistics_(Webb)/12%3A_Correlation_and_Regression/12.01%3A_Correlation/12.1.02%3A_Hypothesis_Test_for_a_Correlation
-    tstat = rho * np.sqrt(dof/(1-rho**2))
-    
-    pval  = sp.stats.t.sf(np.abs(tstat), dof)*2  # two-sided pvalue = Prob(abs(t)>tt)
-    return pval
+ilag      = 0
+im        = 1
+rho       = rflx.isel(lag=ilag,month=im).data
 
 pval      = proc.calc_pval_rho(rho,123)
 cints_p   = np.arange(0,1.05,0.05)
@@ -381,8 +373,6 @@ for im in range(12):
     
     iimax += 1
     
-    
-    
 
 #%% Load raw heat flux and and SST that was used for the calculation
 
@@ -398,10 +388,6 @@ for vv in range(2):
     
 
 #%% Get Point Index
-
-
-
-
 
 def get_closest_indices(lonf,latf,lon,lat,debug=False,return_lin=False):
     # Return x and y indices of closest point to lonf,latf using meshgrid
@@ -552,6 +538,7 @@ pt     = get_closest_indices(lonf,latf,lonreg,latreg,return_lin=True)#252
 m      = 0
 lag    = 1
 lm     = m-lag # Get Lag Month
+monwin = 3
 
 locfn,loctitle = proc.make_locstring(lonf,latf,fancy=True)
 
@@ -735,12 +722,10 @@ pt       = 0
 plotlag  = covall[:,im,pt] * -1
 plotlead = np.flip(covleadall[:,im,pt]) * -1
 
+# Check to make sure they are overalapping
 ax.plot(lags,plotlag)
 ax.plot(leads,plotlead)
-
 ax.plot(leadlags,leadlagscovar[:,im,pt],color='red',ls='dashed')
-
-
 
 #%% For a given month, plot the lead/lag pattern
 
@@ -798,6 +783,7 @@ for il in range(len(plotlags)):
     
     
 #%% Examine Scatterplot
+
 
 
 

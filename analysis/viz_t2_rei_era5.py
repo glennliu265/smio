@@ -80,6 +80,9 @@ dpath_ice = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/0
 nc_masks = dpath_ice + "OISST_ice_masks_1981_2020.nc"
 ds_masks = xr.open_dataset(nc_masks).load()
 
+dsmask_era5 = dl.load_mask(expname='ERA5').mask
+dsmaskplot = xr.where(np.isnan(dsmask_era5),0,1)
+
 # Load AVISO
 dpath_aviso     = dpath_ice + "proc/"
 nc_adt          = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
@@ -90,11 +93,14 @@ cints_adt       = np.arange(-100, 110, 10)
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/05_SMIO/02_Figures/20250521/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250521/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 procpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 
 proc.makedir(figpath)
+
+
+corrected_T2     = False # subtract 2 month to account for double counting Lag 0
 
 # Indicate Experiment and Comparison Name 
 comparename     = "kgm20250417"
@@ -103,6 +109,17 @@ expnames_long   = ["Stochastic Model (with Re-emergence)","ERA5 Reanalysis (1979
 expcols         = ["turquoise","k"]
 expls           = ["dotted",'solid']
 
+# #
+# comparename     = "IncludeInsig"
+# expnames        = ["SST_Obs_Pilot_00_Tdcorr1_qnet_noPositive_SPGNE","SST_Obs_Pilot_00_Tdcorr0_qnet_noPositive","SST_ERA5_1979_2024"]
+# expnames_long   = ["Stochastic Model","Stochastic Model (with re-emergence)","ERA5"]
+# expnames_short  = ["SM","SM_REM","ERA5"]
+# expcols         = ["goldenrod","turquoise","k"]
+# expls           = ["dashed","dotted",'solid']
+
+
+if corrected_T2 is False:
+    print("T2 Correction will be applied...")
 
 #%% Load REI and T2
 
@@ -124,6 +141,8 @@ for ex in range(nexps):
     if 'ens' in ds_rei.dims:
         ds_rei = ds_rei.mean('ens')
         ds_t2  = ds_t2.mean('ens')
+    
+    
     
     reis.append(ds_rei)
     t2s.append(ds_t2)
@@ -197,11 +216,10 @@ plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 
 #%% Compare the T2
-#iyr     = 0
-kmonth  = 1
+
+#iyr            = 0
+kmonth          = 1
 #apply_mask =  ds_masks.mask_mon
-
-
 
 fsz_axis        = 24
 fsz_ticks       = 18
@@ -359,7 +377,9 @@ viz.plot_box(bbsel,ax=ax,proj=proj,color='yellow',linewidth=4,linestyle='solid')
 locfn,loctitle = proc.make_locstring_bbox(bbsel)
 ax.set_title(loctitle,fontsize=42)
 
+# <-> <0> <-> <-> <0> <-> <-> <0> <-> <-> <0> <->
 #%% Inset Map with ERA5 Only (Paper Outline)
+# <-> <0> <-> <-> <0> <-> <-> <0> <-> <-> <0> <->
 
 bbsel = [-40, -15, 52, 62] # [-40, -12, 50, 62]
 
@@ -374,10 +394,13 @@ pmesh           = True
 kmonths         = [1,2]# np.arange(12)
 
 fig,ax,_       = viz.init_orthomap(1,1,bboxplot,figsize=(20,10),centlat=centlat)
-ax             = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+ax             = viz.add_coast_grid(ax,bbox=bboxplot,line_color='dimgray',
+                                    fill_color="lightgray",fontsize=fsz_tick)
 
 # Plot the t2
 plotvar = t2s[ii].isel(mon=kmonths).mean('mon').T2.T #* apply_mask
+if corrected_T2 is False:
+    plotvar = plotvar - 2
 if pmesh:
     cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                           vmin=cints[0],vmax=cints[-1],
@@ -402,10 +425,10 @@ viz.plot_box(bbsel,ax=ax,proj=proj,color='indigo',linewidth=4,linestyle='dashed'
 
 
 # Plot the sea ice edge
-plotvar = ds_masks.mask_mon
+plotvar = dsmaskplot#ds_masks.mask_mon
 cl = ax.contour(plotvar.lon, plotvar.lat,
                 plotvar, colors="cyan",
-                linewidths=2, transform=proj, levels=[0, 1], zorder=1)
+                linewidths=2, transform=proj, levels=[0, 1], zorder=-1)
 
 
 # # Add an Inset! -----------
