@@ -13,7 +13,6 @@ Created on Wed May  7 09:29:32 2025
 
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -79,7 +78,6 @@ proj        = ccrs.PlateCarree()
 
 #%% Load some other things to plot
 
-
 # # Load Sea Ice Masks
 dpath_ice = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
 nc_masks = dpath_ice + "OISST_ice_masks_1981_2020.nc"
@@ -114,7 +112,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20250507/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250523/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 proc.makedir(figpath)
 
@@ -153,12 +151,11 @@ expls           = ["dotted","dashed",'solid']
 # ---
 # (3) Same as (1) but using the runs including non-negative, insignificant HFFs
 comparename     = "IncludeInsig"
-expnames        = ["SST_Obs_Pilot_00_Tdcorr0_qnet_noPositive","SST_Obs_Pilot_00_Tdcorr1_qnet_noPositive_SPGNE","SST_ERA5_1979_2024"]
-expnames_long   = ["Stochastic Model (with re-emergence)","Stochastic Model","ERA5"]
-expnames_short  = ["SM_REM","SM","ERA5"]
-expcols         = ["turquoise","goldenrod","k"]
-expls           = ["dotted","dashed",'solid']
-
+expnames        = ["SST_Obs_Pilot_00_Tdcorr1_qnet_noPositive_SPGNE","SST_Obs_Pilot_00_Tdcorr0_qnet_noPositive","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model","Stochastic Model (with re-emergence)","ERA5"]
+expnames_short  = ["SM","SM_REM","ERA5"]
+expcols         = ["goldenrod","turquoise","k"]
+expls           = ["dashed","dotted",'solid']
 
 #%% Load information for each region
 
@@ -221,7 +218,6 @@ vratio   = (stds_lp  / stds) * 100
 kmonth = 1
 xtks   = lags[::6]
 conf   = 0.95
-
 
 for kmonth in range(12):
     fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
@@ -361,14 +357,17 @@ fig,ax          = plt.subplots(1,1,constrained_layout=True,figsize=(6,6))
 braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
 blp             = ax.bar(np.arange(nexps),instd_lp,color='k')
 
-ax.bar_label(braw,fmt="%.04f",c='gray')
-ax.bar_label(blp,fmt="%.04f",c='k')
+ax.bar_label(braw,fmt="%.02f",c='gray')
+ax.bar_label(blp,fmt="%.02f",c='k')
 
 #ax.bar_label(vratio,fmt="%.2f",c=w,label_type='bottom')
 
 ax.set_xticks(np.arange(nexps),labels=xlabs)
 ax.set_ylabel("$\sigma$(SST) [$\degree$C]")
 ax.set_ylim([0,1.0])
+
+savename = "%sBarplots_%s_%s.png" % (figpath,comparename,expnames[ex])
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Do F-test
 

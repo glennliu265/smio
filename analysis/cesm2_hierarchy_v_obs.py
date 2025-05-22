@@ -256,8 +256,8 @@ for rr in range(nregs):
     braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
     blp             = ax.bar(np.arange(nexps),instd_lp,color='k')
     
-    ax.bar_label(braw,fmt="%.04f",c='gray')
-    ax.bar_label(blp,fmt="%.04f",c='k')
+    ax.bar_label(braw,fmt="%.02f",c='gray')
+    ax.bar_label(blp,fmt="%.02f",c='k')
     
     #ax.bar_label(vratio,fmt="%.2f",c=w,label_type='bottom')
     
@@ -328,13 +328,13 @@ for rr in range(2):
     plt.savefig(figname,transparent=True,bbox_inches='tight')
 
 #%% Investigate Flx-SST Lag Relationship
-rr       = 0
-monwin   = 3
-lagcc    = np.arange(0,12,1)
-dumll   = dict(lon=1,lat=1)
+rr          = 0
+monwin      = 3
+lagcc       = np.arange(0,12,1)
+dumll       = dict(lon=1,lat=1)
 
-covars     = []
-covars_lp  = []
+covars      = []
+covars_lp   = []
 for ex in range(nexps):
     
     var1      = aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
@@ -345,22 +345,19 @@ for ex in range(nexps):
     
     
 #% Plot each case 
-
 imon   = 1
 fig,ax = plt.subplots(1,1,figsize=(8,4),constrained_layout=True)
-
 for ex in range(nexps):
+    
     # if ex >0:
     #     continue
     plotvar = covars[ex].isel(mon=imon)
-    
     ax.plot(plotvar.lag.data,plotvar,c=expcols[ex],label=expnames_long[ex])
-    
+
 ax.legend()
 
 ax.axhline([0],lw=0.75,c="k")
 ax.axvline([0],lw=0.75,c="k")
-
 
 ax.set_title(bbnames[rr])
 

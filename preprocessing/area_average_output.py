@@ -178,7 +178,6 @@ for ff in tqdm.tqdm(range(nfiles)):
         #plt.scatter(dsreg.TLONG,dsreg.TLAT,c=dsreg[vname].isel(time=0)),plt.show()
     
     aavgs.append(dsavg)
-    
 
 # ds     = xr.open_dataset(nclist[0])
 # dsreg  = proc.sel_region_xr(ds,bbsel).load()

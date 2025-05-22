@@ -75,8 +75,7 @@ rhocrit     = proc.ttest_rho(0.05, 2, 86)
 
 proj        = ccrs.PlateCarree()
 
-
-bbox_spgne = [-40,-15,52,62]
+bbox_spgne  = [-40,-15,52,62]
 
 #%% Load the data
 
