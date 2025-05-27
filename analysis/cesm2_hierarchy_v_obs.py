@@ -332,6 +332,12 @@ rr          = 0
 monwin      = 3
 lagcc       = np.arange(0,12,1)
 dumll       = dict(lon=1,lat=1)
+lpcutoff    = 60
+
+calc_corr   = False
+
+
+lpfilt      = lambda x: proc.lp_butter(x,lpcutoff,6)
 
 covars      = []
 covars_lp   = []
@@ -339,25 +345,245 @@ for ex in range(nexps):
     
     var1      = aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
     var2      = flx_aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
-    out       = scm.calc_leadlagcovar(var1,var2,lagcc,monwin=monwin)
+    out       = scm.calc_leadlagcovar(var1,var2,lagcc,monwin=monwin,calc_corr=calc_corr)
     
     covars.append(out.squeeze())
     
+    var1_lp   = xr.apply_ufunc(lpfilt,var1,input_core_dims=[['time'],],output_core_dims=[['time'],],vectorize=True)
+    var2_lp   = xr.apply_ufunc(lpfilt,var2,input_core_dims=[['time'],],output_core_dims=[['time'],],vectorize=True)
     
-#% Plot each case 
-imon   = 1
-fig,ax = plt.subplots(1,1,figsize=(8,4),constrained_layout=True)
+    out_lp    = scm.calc_leadlagcovar(var1_lp.transpose('time','lat','lon'),
+                                      var2_lp.transpose('time','lat','lon'),
+                                      lagcc,monwin=monwin,calc_corr=calc_corr)
+    
+    covars_lp.append(out_lp.squeeze())
+    #var1_lp   = aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
+
+    
+#%% Plot each case 
+
+imon   = 6 # Indicatesthe Month
+mons3  =  proc.get_monstr()
+
+def get_monlag(basemonth,leadlags):
+    mons3       = proc.get_monstr()
+    nlags       = len(leadlags)
+    leadlagmons = []
+    for ll in range(nlags):
+        # First determine the month
+        #m  = basemonth + np.sign(leadlags[ll]) * (leadlags[ll]%12) 
+        m  = basemonth + (leadlags[ll]%12) 
+        im = m%12 - 1
+        if im == (-1):
+            im = 11
+        leadlagmons.append(mons3[im])
+    return leadlagmons
+
+
+for imon in range(12):
+    
+    leadlags = covars[ex].lag.data
+    lllab    = get_monlag(imon+1,leadlags) 
+    nlags    = len(leadlags)
+    fig,axs = plt.subplots(2,1,figsize=(8,6),constrained_layout=True)
+    
+    for ii,ax in enumerate(axs):
+        
+        if ii == 0:
+            incov = covars
+        else:
+            incov = covars_lp
+        
+        for ex in range(nexps):
+            # if ex >0:
+            #     continue
+            plotvar = incov[ex].isel(mon=imon)
+            ax.plot(plotvar.lag.data,plotvar,c=expcols[ex],label=expnames_long[ex],marker='o')
+        
+        #ax.legend()
+        
+        ax.axhline([0],lw=0.75,c="k")
+        ax.axvline([0],lw=0.75,c="k")
+        
+        # Label X Axis
+        
+        xlabels = ["%s\n%s" % (leadlags[ll],lllab[ll]) for ll in range(nlags)]
+        ax.set_xticks(leadlags,labels=xlabels)
+        
+        
+        if ii == 1:
+            if rr == 0:
+                ax.set_ylim([-3,3])
+            else:
+                ax.set_ylim([-.2,.2])
+            ax.set_xlabel("SST Lag relative to Qnet (Months)\n  << SST Leads | Qnet Leads >>")
+            
+        else:
+            ax.legend()
+            if rr == 0:
+                ax.set_ylim([-20,20])
+            else:
+                ax.set_ylim([-2,2])
+                
+
+            
+            title = "%s Lag Covariance, %s" % (mons3[imon],bbnames[rr])
+            ylab  = r"SST-Qnet Covariance [$\degree C \, \frac{W}{m^2}$]"
+            calcname = "LagCovar"
+            
+        
+        if calc_corr:
+            title = "%s Lag Correlation, %s" % (mons3[imon],bbnames[rr])
+            ylab  = r"SST-Qnet Cross-correlation [$\degree C \, \frac{W}{m^2}$]"
+            ax.set_ylim([-1,1])
+            calcname = "crosscorr"
+            
+        ax.set_title(title)
+        ax.set_ylabel(ylab)
+    
+    figname = "%sFLX_SST_%s_CESM2Hierarchy_%s_lpf%i_mon%02i.png" % (figpath,calcname,bbnames[rr],lpcutoff,imon+1)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+    
+#%% Try all month case
+
+
+def calc_leadlagcovar_allmon(var1,var2,lags,dim=0,return_da=True,ds_flag=False):
+    
+    if type(var1) == xr.DataArray:
+        ds_flag = True
+        lat     = var1.lat
+        lon     = var1.lon
+        var1    = var1.data
+    if type(var2) == xr.DataArray:
+        ds_flag = True
+        lat     = var2.lat
+        lon     = var2.lon
+        var2    = var2.data
+        
+    # Assume time is in the first dimension
+    lagcovar,winlens       = proc.calc_lag_covar_ann(var1,var2,lags,dim,0,)
+    lagcovar_lead,_        = proc.calc_lag_covar_ann(var2,var1,lags,dim,0,)
+    leadlags               = np.hstack([-1*np.flip(lags)[:-1],lags])
+    
+    # Flip Along Lead Dimension and drop Lead 0
+    cov_lead_flip  = np.flip(lagcovar_lead[1:,:,:],0) 
+    lagcovar_out   = np.concatenate([cov_lead_flip,lagcovar],axis=0)
+    
+    if return_da:
+        if ds_flag:
+            coords     = dict(lag=leadlags,lat=lat,lon=lon)
+        else:
+            coords = dict(lag=leadlags)
+        da_out = xr.DataArray(lagcovar_out,coords=coords,dims=coords,name='cov')
+        return da_out
+    return lagcovar_out,leadlags
+    
+    
+    
+lagsall            = np.arange(61)
+
+covars_allmon      = []
+covars_allmon_lp   = []
 for ex in range(nexps):
     
-    # if ex >0:
-    #     continue
-    plotvar = covars[ex].isel(mon=imon)
-    ax.plot(plotvar.lag.data,plotvar,c=expcols[ex],label=expnames_long[ex])
+    var1      = aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
+    var2      = flx_aavgs_byreg[rr][ex].expand_dims(dumll).transpose('time','lat','lon')
+    da_out    = calc_leadlagcovar_allmon(var1,var2,lagsall,dim=0,return_da=True)
 
-ax.legend()
+    
+    covars_allmon.append(da_out.squeeze())
+    
+    var1_lp   = xr.apply_ufunc(lpfilt,var1,input_core_dims=[['time'],],output_core_dims=[['time'],],vectorize=True)
+    var2_lp   = xr.apply_ufunc(lpfilt,var2,input_core_dims=[['time'],],output_core_dims=[['time'],],vectorize=True)
+    
+    da_out_lp    = calc_leadlagcovar_allmon(var1_lp.transpose('time','lat','lon'),
+                                      var2_lp.transpose('time','lat','lon'),
+                                      lagsall)
+    
+    covars_allmon_lp.append(da_out_lp)
+    
+#%% Plot each case (all months)
 
-ax.axhline([0],lw=0.75,c="k")
-ax.axvline([0],lw=0.75,c="k")
+mons3  =  proc.get_monstr()
+calc_corr = False
 
-ax.set_title(bbnames[rr])
+def get_monlag(basemonth,leadlags):
+    mons3       = proc.get_monstr()
+    nlags       = len(leadlags)
+    leadlagmons = []
+    for ll in range(nlags):
+        # First determine the month
+        #m  = basemonth + np.sign(leadlags[ll]) * (leadlags[ll]%12) 
+        m  = basemonth + (leadlags[ll]%12) 
+        im = m%12 - 1
+        if im == (-1):
+            im = 11
+        leadlagmons.append(mons3[im])
+    return leadlagmons
 
+    
+leadlags = covars[ex].lag.data
+lllab    = get_monlag(imon+1,leadlags) 
+nlags    = len(leadlags)
+fig,axs = plt.subplots(2,1,figsize=(8,6),constrained_layout=True)
+
+for ii,ax in enumerate(axs):
+    
+    if ii == 0:
+        incov = covars_allmon
+    else:
+        incov = covars_allmon_lp
+    
+    for ex in range(nexps):
+        # if ex >0:
+        #     continue
+        plotvar = incov[ex].squeeze()#.isel(mon=imon)
+        ax.plot(plotvar.lag.data,plotvar,c=expcols[ex],label=expnames_long[ex],marker='o')
+    
+    #ax.legend()
+    
+    ax.axhline([0],lw=0.75,c="k")
+    ax.axvline([0],lw=0.75,c="k")
+    
+    # Label X Axis
+    
+    #xlabels = ["%s\n%s" % (leadlags[ll],lllab[ll]) for ll in range(nlags)]
+    ax.set_xticks(leadlags,)#labels=xlabels)
+    
+    
+    if ii == 1: # LP limits
+        if rr == 0:
+            ax.set_ylim([-1,1])
+        else:
+            ax.set_ylim([-1,1])
+        ax.set_xlabel("SST Lag relative to Qnet (Months)\n  << SST Leads | Qnet Leads >>")
+        
+    else:
+        ax.legend()
+        if rr == 0:
+            ax.set_ylim([-.5,.5])
+        else:
+            ax.set_ylim([-0.5,0.5])
+            
+
+        
+        title = "All-Month Lag Covariance, %s" % (bbnames[rr])
+        ylab  = r"SST-Qnet Covariance [$\degree C \, \frac{W}{m^2}$]"
+        calcname = "LagCovar"
+        
+    
+    if calc_corr:
+        title = "All-Month Lag Correlation, %s" % (bbnames[rr])
+        ylab  = r"SST-Qnet Cross-correlation [$\degree C \, \frac{W}{m^2}$]"
+        ax.set_ylim([-1,1])
+        calcname = "crosscorr"
+        
+    ax.set_title(title)
+    ax.set_ylabel(ylab)
+    
+    ax.set_xlim([-11,11])
+
+figname = "%sFLX_SST_%s_CESM2Hierarchy_%s_lpf%i_ALLMON.png" % (figpath,calcname,bbnames[rr],lpcutoff)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
