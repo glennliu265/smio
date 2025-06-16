@@ -57,7 +57,7 @@ proj = ccrs.PlateCarree()
 bbplot = [-80, 0, 35, 75]
 mons3 = proc.get_monstr()
 
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250513/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250617/"
 
 proc.makedir(figpath)
 
@@ -146,10 +146,10 @@ pilot      : Same as was used for the SSS Paper
 noPositive : Just set positive HFF to zero
 p10        : Use p = 0.10
 p20        : Use p = 0.20
-
+AConly     : Test Autocorrelation Only
 
 """
-signame = "noPositive"#"noPositive"#"pilot" #"noPositive" # 
+signame ="p20"# "noPositive"#"noPositive"#"pilot" #"noPositive" # 
 print("Significance Testing Option is: %s" % (signame))
 
 hff   = damping_era5.copy()
@@ -178,6 +178,9 @@ elif signame == "p10":
     setdict['p'] = 0.10
 elif signame == "p20":
     setdict['p'] = 0.20
+elif signame == "AConly":
+    setdict['method'] = 2
+
 
 # dof was set above
 
@@ -188,8 +191,6 @@ dampingmasked, freq_success, sigmask = scm.prep_HF(hff, rsst, rflx,
                                                    returnall=True)  # expects, [month x lag x lat x lon], should generalized with ensemble dimension?
 print("Completed significance testing in %.2fs" % (time.time()-st))
 
-
-
 dampingout = dampingmasked[:,setdict['sellags'],:,:].squeeze()
 dampingout = xr.where(np.isnan(dampingout),0.,dampingout)
 
@@ -197,18 +198,20 @@ dampingout = xr.where(np.isnan(dampingout),0.,dampingout)
 fsz_title = 24 
 bbsim     = [-40,-15,52,62]
 bbspgne   = [-40,-15,52,62]
-ilag      = 0
+ilag      = 2   
 
-im = 'min'
+im        = 0#'min'
 
 
 for im in range(12):
+    
     if im is 'min':
         plotvar   = hff.isel(lag=ilag).min('month') #dampingout.isel(month=imon)#
     else:
         plotvar   = hff.isel(lag=ilag,month=im)
     
     isneg     = xr.where(plotvar<0,1,0)
+    is_insig = np.where(np.isnan(sigmask[im,ilag,:,:]),1,0)#xr.where()
     
     bbplot2   = [-50,0,50,65]
     
@@ -222,6 +225,10 @@ for im in range(12):
     # Plot Negative Points
     viz.plot_mask(plotvar.lon,plotvar.lat,isneg.T,reverse=True,
                   geoaxes=True,proj=proj,ax=ax,color='k',markersize=0.2)
+    
+    # # Plot Significant POints
+    # viz.plot_mask(plotvar.lon,plotvar.lat,is_insig.T,reverse=True,marker="x",
+    #               geoaxes=True,proj=proj,ax=ax,color='yellow',markersize=0.2)
     
     
     plotvar   = plotmask
@@ -324,7 +331,7 @@ pval       = proc.calc_pval_rho(rflx,123)
 
 #%%Plot just the pvalue (max for all months)
 max_all_mon = False
-im          = 1
+im          = 0
 
 
 iimax = 0
@@ -527,7 +534,6 @@ for l in range(nlags):
         covleadall[l,m,:] = covlead.copy()
 
 #%% Scatterplot for a particular Point
-
 
 lonreg = dsreg[0].lon.data
 latreg = dsreg[0].lat.data
@@ -779,7 +785,9 @@ for il in range(len(plotlags)):
     
     figname = "%sSST_FLX_Lag_Covar_Map_kmonth%02i_lag%02i.png" % (figpath,basemonth_index,plotlag)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
-    
+
+
+
     
     
 #%% Examine Scatterplot
@@ -858,3 +866,129 @@ for il in range(len(plotlags)):
     
 #     figname = "%sHFF_Check_ERA5_%s_%s_mon%02i_lag%i.png" % (figpath,flxname,signame,imon+1,ilag+1)
 #     plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% Check to see if any points are significant for lag 2 or lag3, but not lag 1
+
+sig_lag2only = np.where(np.isnan(sigmask[:,0,:,:]) & (sigmask[:,1,:,:] == 1),1,0)
+sig_lag3only = np.where(np.isnan(sigmask[:,0,:,:]) & (sigmask[:,2,:,:] == 1),1,0)
+
+sigcount     = np.nansum(sigmask,1)
+sigcount     = np.where(sigcount==0,np.nan,sigcount)
+
+#%%Make Plots Showing wher ethe location is
+fsz_axis      = 16
+
+plot_sigcount = True # True to Plot Count of Significant Testimates, False to Plot Lag 1, 2 and 3
+spgne_only    = True # Set to True to plot SPGNE Only
+lat      = hff.lat
+lon      = hff.lon
+im       = 0
+
+for im in range(12):
+    
+    if spgne_only:
+        fig,ax,bb = viz.init_regplot(regname="SPGE")
+    else:
+        
+        fig,ax,bb = viz.init_regplot(regname="NAT")
+
+    if plot_sigcount:
+        plotvar = sigcount[im,:,:]
+        pcm     = ax.pcolormesh(lon,lat,plotvar,transform=proj)
+        
+        cb      = viz.hcbar(pcm,ax=ax)
+        cb.set_label("# of Significant Estimates Across 3 Lags (%s)" % (mons3[im]),fontsize=fsz_axis)
+        
+        
+        figname = "%sHFF_Significance_Count_Test_%s_mon%02i.png" % (figpath,signame,im+1)
+    else:
+        
+                
+        plotvar = sig_lag2only[im,:,:]
+        cf2     = ax.contour(lon,lat,plotvar,levels=[0,1,],colors='blue',transform=proj,label="Lag 2 Only")
+        
+        plotvar = sig_lag3only[im,:,:]
+        cf3     = ax.contour(lon,lat,plotvar,levels=[0,1,],colors='goldenrod',transform=proj,label="Lag 3 Only",linestyles='dashed')
+        
+        ax.legend()
+        
+
+
+
+        figname = "%sHFF_Sig_Lag2or3_Only_Test_%s_mon%02i.png" % (figpath,signame,im+1)
+        
+    # Plot the SPGNE Box
+    viz.plot_box(bbspgne,ax=ax,color='limegreen',linewidth=4,proj=proj)
+        
+    if spgne_only:
+        figname = proc.addstrtoext(figname,"_SPGNE")
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Plot Estimates for a Given Month
+
+im = 6
+
+fig,axs,_  = viz.init_orthomap(1,3,bboxplot=bbplot2,figsize=(18,8),centlon=-25)
+
+for a,ax in enumerate(axs):
+    
+    # Plot Features
+    ax        = viz.add_coast_grid(ax,bbox=bbplot2,proj=proj,fill_color="k")
+    
+    # Plot the SPGNE Box
+    viz.plot_box(bbspgne,ax=ax,color='limegreen',linewidth=4,proj=proj)
+    
+    ax.set_title("Lag %i" % (a+1),fontsize=fsz_title)
+    
+    
+    # Select and plot Damping
+    plotvar   = hff.isel(lag=a,month=im)
+    plotmask  = sigmask[im,a,:,:]
+    pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar * plotmask,transform=proj,
+                            cmap='cmo.balance',vmin=-25,vmax=25)
+    
+    # # Select and plot significant estimates
+    # viz.plot_mask(plotvar.lon,plotvar.lat,plotmask.T,reverse=False,
+    #               geoaxes=True,proj=proj,ax=ax,color='gray',markersize=0.2)
+    
+
+cb = viz.hcbar(pcm,ax=axs.flatten())
+#figname = plt.savefig("%s" % (figname,))
+
+#%% Make some plots of damping estimates for 3 lags @ A SELECTED POINT
+
+lagcols = ['r','magenta','b']
+
+lonf            = -17
+latf            = 54
+
+locfn,loctitle=proc.make_locstring(lonf,latf)
+
+plothff         = proc.selpt_ds(hff,lonf,latf,)
+klon,klat       = proc.find_latlon(lonf,latf,hff.lon.data,hff.lat.data,)
+
+
+
+
+fig,ax = viz.init_monplot(1,1)
+
+for ii in range(3):
+    plotsig = sigmask[:,ii,klat,klon] == 1
+    
+    
+    ax.plot(mons3,plothff.isel(lag=ii),label="Lag %i" % (ii+1),c=lagcols[ii])
+    
+    ax.scatter(np.array(mons3)[plotsig],plothff.isel(lag=ii).data[plotsig],marker='o',c=lagcols[ii])
+    
+ax.legend()
+ax.set_title("HFF Estimates @ %s" % loctitle)
+ax.axhline([0,],ls='dashed',lw=0.75,color='k')
+ax.set_ylim([-50,50])
+
+
+
+#%% Zoom in on Study Region
+
+fig,ax,bb = viz.init_regplot(regname="SPGE")
+
