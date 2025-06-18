@@ -7,6 +7,7 @@ Calculate Average SST for several observational products
 Created on Thu May  8 09:15:56 2025
 
 @author: gliu
+
 """
 
 import time
@@ -42,8 +43,8 @@ dpath_aavg      = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data
 regname         = "SPGNE"
 bbsel           = [-40,-15,52,62]
 
-regname         = "NNAT"
-bbsel           = [-80,0,20,60]
+# regname         = "NNAT"
+# bbsel           = [-80,0,20,60]
 
 
 # Set up Output Path
@@ -196,8 +197,8 @@ print("Loaded in %.2fs" % (time.time()-st))
 # %% ERSST 5
 #
 
-expname     = "ERSST5"
-vname       = "sst"
+expname         = "ERSST5"
+vname           = "sst"
 ystart          = 1854
 yend            = 2017
 procstring      = "raw"
@@ -205,8 +206,8 @@ outname         = "%s%s_%s_%s_%s_%s.nc" % (outpath,expname,vname,ystart,yend,pro
 print(outname)
 vname_out       = 'sst'
 
-rawnc       = "ERSST5.nc"
-dpathraw    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
+rawnc           = "ERSST5.nc"
+dpathraw        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 st              = time.time()
 dsfull          = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
 dsreg           = proc.sel_region_xr(dsfull,bbsel).load()[vname]
@@ -219,6 +220,84 @@ dsreg = dsreg.sel(time=slice(None,'2017-12-31'))
 aavg            = proc.area_avg_cosweight(dsreg)
 try:
     aavg            = aavg.rename(vname_out)
+except:
+    aavg = aavg.rename({vname:vname_out})
+edict           = proc.make_encoding_dict(aavg)
+aavg.to_netcdf(outname,encoding=edict)
+print("Loaded in %.2fs" % (time.time()-st))
+
+# ======================
+#%% Preprocess for DCENT
+# ======================
+
+# Indicate Output
+expname         = "DCENT_EnsMean"
+vname           = "sst"
+ystart          = 1850
+yend            = 2023
+procstring      = "raw"
+outname         = "%s%s_%s_%s_%s_%s.nc" % (outpath,expname,vname,ystart,yend,procstring)
+print(outname)
+vname_out       = 'sst'
+
+# Open the File and crop to region
+rawnc           = "DCENT_ensemble_1850_2023_ensemble_mean.nc"
+dpathraw        = "/Users/gliu/Globus_File_Transfer/Reanalysis/DCENT/"
+st              = time.time()
+dsfull          = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
+
+# Do some preprocessing (Flip Longitude)
+dsfull          = proc.format_ds(dsfull[vname])
+
+dsreg           = proc.sel_region_xr(dsfull,bbsel).load()#[vname]
+proc.printtime(st,print_str='Loaded')
+
+# Take Area Average and Save
+aavg            = proc.area_avg_cosweight(dsreg)
+try:
+    aavg            = aavg.rename(vname_out)
+except:
+    aavg = aavg.rename({vname:vname_out})
+edict           = proc.make_encoding_dict(aavg)
+aavg.to_netcdf(outname,encoding=edict)
+print("Loaded in %.2fs" % (time.time()-st))
+
+
+# =================
+# %% COBE2 
+# =================
+
+# Open the File and crop to region
+st              = time.time()
+rawnc           = "sst.mon.mean.nc"
+dpathraw        = "/Users/gliu/Globus_File_Transfer/Reanalysis/COBE2/"
+dsfull          = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
+
+# Indicate Output Settings
+expname         = "COBE2"
+vname           = "sst"
+ystart          = 1850
+yend            = 2024
+procstring      = "raw"
+outname         = "%s%s_%s_%s_%s_%s.nc" % (outpath,expname,vname,ystart,yend,procstring)
+print(outname)
+vname_out       = 'sst'
+
+# Slice to Time, Flip Longitude to 180
+dsfull          = proc.format_ds(dsfull)
+tstart          = '%04i-01-01' % ystart
+tend            = "%04i-12-31" % yend
+dsfull          = dsfull.sel(time=slice(tstart,tend))
+dsfull          = dsfull[vname]
+
+# Crop to Region
+dsreg           = proc.sel_region_xr(dsfull,bbsel).load()
+proc.printtime(st,print_str='Loaded')
+
+# Take Area Average and Save
+aavg            = proc.area_avg_cosweight(dsreg)
+try:
+    aavg        = aavg.rename(vname_out)
 except:
     aavg = aavg.rename({vname:vname_out})
 edict           = proc.make_encoding_dict(aavg)
