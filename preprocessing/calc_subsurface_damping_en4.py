@@ -7,6 +7,10 @@ Calculate Subsurface Damping from EN4 Profiles
     - Based on [preproc_detrainment_data] (ACF calculation)
     - Then copied from [calc_detrainment_correlation_pointwise] for corr-based lbd_d
 
+Update [2025.07.01], support ORAS5 Calculations
+    - Used cropped region from [crop_oras5_natl]
+    - Used regridded MLD to ERA5 resolution (MIMOC)
+
 
 Created on Tue Jun 24 13:10:54 2025
 
@@ -79,32 +83,68 @@ def fit_exp_ens(acfs_mon,lagmax):
             acf_est[im, :, zz]  = outdict['acf_fit'].copy()
     return tau_est,acf_est
 
-#%% Load Datasets
+#%% Load Datasets (depending on dataset)
 
-# Load EN4 Profiles
-en4path     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/EN4/proc/"
-en4nc       = "EN4_3D_TEMP_NAtl_1900_2021.nc"
-ds_en4      = xr.open_dataset(en4path + en4nc).temperature.load()
+dataset_name = "ORAS5" # EN4 # Indicate which Dataset
+
+st = time.time()
+if dataset_name == "EN4":
+    # Load EN4 Profiles
+    en4path     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/EN4/proc/"
+    en4nc       = "EN4_3D_TEMP_NAtl_1900_2021.nc"
+    ds_temp     = xr.open_dataset(en4path + en4nc).temperature.load()
+    
+    
+    # Load and query MIMOC (regridded by regrid_mimoc_EN4.py)
+    method          = "bilinear"
+    mimocpath       = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    mimocnc         = "%sMIMOC_RegridEN4_mld_%s_Global_Climatology.nc" % (mimocpath,method)
+    ds_mld = xr.open_dataset(mimocnc).load()
+    
+    # Set Cropping Time Period/Region
+    tstart = 1900
+    tend   = 2021
+    bbcalc = [-80,0,0,65]
+    
+elif dataset_name == "ORAS5":
+    
+    # Load ORAS5 Profiles
+    oraspath = "/Users/gliu/Globus_File_Transfer/Reanalysis/ORAS5/proc/"
+    orasnc   = "ORAS5_TEMP_NAtl_1979_2018.nc"
+    ds_temp  = xr.open_dataset(oraspath + orasnc).TEMP.load()
+    
+    # Load MIMOC (ERA5 Resolution)
+    mimocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    mimocnc   = "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
+    ds_mld    = xr.open_dataset(mimocpath + mimocnc).load()
+    
+    # Set Cropping Time Period
+    tstart = 1979
+    tend   = 2018
+    bbcalc = [-40,-15,52,62]
+    
+    ds_temp = ds_temp.rename(dict(z_t='depth'))
+    
+else:
+    
+    print("Currently only supports the following datasets:\n")
+    print("\tEN4")
+    print("\tORAS5")
+    
+    
+proc.printtime(st,print_str="Loaded")
 
 
-# Load and query MIMOC (regridded by regrid_mimoc_EN4.py)
-method          = "bilinear"
-mimocpath       = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-mimocnc         = "%sMIMOC_RegridEN4_mld_%s_Global_Climatology.nc" % (mimocpath,method)
-ds_mld = xr.open_dataset(mimocnc).load()
 
 #%% Detrainment calculation Options
 
-tstart = 1900
-tend   = 2021
-tstr   = "%04ito%04i" % (tstart,tend)
 
+
+# Set Time Period Strings
+tstr    = "%04ito%04i" % (tstart,tend)
 
 lags    = np.arange(0,37,1)
 nlags   = len(lags)
-
-bbcalc  = [-80,0,0,65]
-
 
 lagmax  = 3
 
@@ -118,41 +158,66 @@ lagmax  = 3
 ds_mld = proc.sel_region_xr(ds_mld.mld,bbcalc) # Mon x Lat x Lon
 
 # Slice to time (TEMP)
-ds_en4 = ds_en4.sel(time=slice("%04i-01-01" % tstart,"%04i-12-31" % tend)) # [time x depth x lat x lon]
+ds_temp = ds_temp.sel(time=slice("%04i-01-01" % tstart,"%04i-12-31" % tend)) # [time x depth x lat x lon]
+
+# Slice to region (TEMP)
+if "TLONG" in ds_temp.coords:
+    ds_temp = proc.sel_region_xr_cv(ds_temp,bbcalc,debug=False)
+    
+
 
 # Slice to max MLD Depth (take first level that exceeds deepest)
 max_mld             = np.ceil(np.nanmax(ds_mld.data.flatten()))
-en4depths           = ds_en4.depth
+en4depths           = ds_temp.depth
 depthdiff           = en4depths.data - max_mld
 idx_deeper          = np.where(depthdiff>0)[0][0] # Find first index deeper than max climatological MLD
 print("Maximum Mixed-Layer Depth is %.2f meters in MIMOC" % (max_mld))
-print("This is between %i (%.2f) and %i (%.2f) in EN4" % (idx_deeper-1,en4depths.isel(depth=idx_deeper-1),
-                                                          idx_deeper,en4depths.isel(depth=idx_deeper)
+print("This is between %i (%.2f) and %i (%.2f) in %s" % (idx_deeper-1,en4depths.isel(depth=idx_deeper-1),
+                                                          idx_deeper,en4depths.isel(depth=idx_deeper),
+                                                          dataset_name,
                                                           ))
-ds_en4 = ds_en4.isel(depth=slice(0,idx_deeper+1))
+ds_temp = ds_temp.isel(depth=slice(0,idx_deeper+1))
 
 
 
-#%% Reprocess and detrend
+#%% Reprocess and detrend (took 82 sec for NATL ORAS5, 2.36 sec for SPGNE)
 
-dtvar_anom = proc.xrdeseason(ds_en4)
+dtvar_anom = proc.xrdeseason(ds_temp)
 dtvar_anom = proc.xrdetrend(dtvar_anom)
 
 
 #%% Retrieve Dimensions and reshape to year x mon
 
+
+
+if "TLONG" in ds_temp.coords: # For Processed ORAS5 data, look for TLONG
+
+    lon         = dtvar_anom.TLONG.data
+    lat         = dtvar_anom.TLAT.data
+    lon360_flag = True
+    coords2D    = True
+    
+else: # For EN4, 1-D lat/lon
+    
+    lon         = dtvar_anom.lon.data
+    lat         = dtvar_anom.lat.data
+    lon360_flag = False
+    coords2D   = False
+    
+    
+    
+z                  = dtvar_anom.depth.data
 ntime,nz,nlat,nlon = dtvar_anom.shape
 nyr                = int(ntime/12)
-
-
-lon = dtvar_anom.lon.data
-lat = dtvar_anom.lat.data
-z   = dtvar_anom.depth.data
-
 dtvar_yrmon        = dtvar_anom.data.reshape((nyr,12,nz,nlat,nlon))
+
+# Looping will be done w.r.t. MLD coordinates
+lon_mld = ds_mld.lon
+lat_mld = ds_mld.lat
 
 
 #%% Calculate the ACF and detrainment (timescale-based)
+
 lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
 tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
 acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
@@ -176,7 +241,17 @@ for o in tqdm.tqdm(range(nlon)):
         
         
         # Retrieve Mixed layer depth cycle at a point
-        hpt  = ds_mld.sel(lon=lon[o],lat=lat[a],method='nearest').values#[month]
+        if coords2D:
+            lonf = lon[a,o]
+            latf = lat[a,o]
+        else:
+            lonf = lon[o]
+            latf = lat[a]
+        if lon360_flag and lonf > 180:
+            print("Converting Longitude to degrees West")
+            lonf = lonf - 360
+        
+        hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
         if np.any(np.isnan(hpt)):
             continue
         
@@ -209,25 +284,49 @@ for o in tqdm.tqdm(range(nlon)):
         
 #%% Check the output
 
+
+mons       = np.arange(1,13,1)
 nlat       = np.arange(0,nlat)
 nlon       = np.arange(0,nlon)
-mons       = np.arange(1,13,1)
-        
-# Make data arrays
-lcoords    = dict(mon=mons,lat=lat,lon=lon)
-da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
 
-taucoords  = dict(mon=mons,z_t=z,lat=lat,lon=lon)
-da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+if coords2D:
+    coordsxy = dict(nlat=nlat,nlon=nlon)
+    
+    da_TLONG = xr.DataArray(ds_temp.TLONG,coords=coordsxy,dims=coordsxy,name="TLONG")
+    da_TLAT  = xr.DataArray(ds_temp.TLAT,coords=coordsxy,dims=coordsxy,name="TLAT")
+    
+    # Make data arrays
+    lcoords    = dict(mon=mons,lat=nlat,lon=nlon)
+    da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
+    
+    taucoords  = dict(mon=mons,z_t=z,lat=nlat,lon=nlon)
+    da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+    
+    acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=nlat,lon=nlon)
+    da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
+    da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+    
+    ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_TLONG,da_TLAT])
+    
+else: # 1-D coorindates Case (EN4)
+    
+    # Make data arrays
+    lcoords    = dict(mon=mons,lat=lat,lon=lon)
+    da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
 
-acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=lat,lon=lon)
-da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
-da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+    taucoords  = dict(mon=mons,z_t=z,lat=lat,lon=lon)
+    da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+
+    acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=lat,lon=lon)
+    da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
+    da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+    
+    ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,])
 
 
-ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,])
 edict      = proc.make_encoding_dict(ds_out)
-savename   = "%sEN4_MIMOC_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,'TEMP','linear',lagmax,tstr)
+savename   = "%s%s_MIMOC_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,
+                                                                       'TEMP','linear',lagmax,tstr)
 ds_out.to_netcdf(savename,encoding=edict)
 
 #%% Use the ACFs to compute the detrainment, correlation based
@@ -273,20 +372,30 @@ lbd_in      = ds_out.lbd_d
 corr_out    = np.zeros(lbd_in.shape)*np.nan
 _,nlat,nlon = corr_out.shape
 
-z_t         = ds_en4.depth
-
+z_t         = ds_temp.depth
 
 acf_ens     = ds_out.acf_mon
 
 # Note, edited so that dtdepth = True 
-debug = True
+debug       = True
 
 # Loop for each point
 for a in tqdm.tqdm(range(nlat)):
     for o in range(nlon):
         
         # Select MLD at point
-        hpt    = ds_mld.sel(lon=lon[o],lat=lat[a],method='nearest')
+        # Retrieve Mixed layer depth cycle at a point
+        if coords2D:
+            lonf = lon[a,o]
+            latf = lat[a,o]
+        else:
+            lonf = lon[o]
+            latf = lat[a]
+        if lon360_flag and lonf > 180:
+            print("Converting Longitude to degrees West")
+            lonf = lonf - 360
+            
+        hpt    = ds_mld.sel(lon=lonf,lat=latf,method='nearest')
         if np.all(np.isnan(hpt)): # Skip for land point
             continue
         
@@ -294,7 +403,7 @@ for a in tqdm.tqdm(range(nlat)):
         immin = hpt.argmin().values.item()
         
         # Compute kprev for the ensemble member
-        kprev   = kprevall.sel(lon=lon[o],lat=lat[a],method='nearest').values
+        kprev   = kprevall.sel(lon=lonf,lat=latf,method='nearest').values
         
         for im in range(12):
             detrain_mon = kprev[im]
@@ -330,7 +439,7 @@ for a in tqdm.tqdm(range(nlat)):
             # First, get the depths
             if dtdepth: # Just retrieve at the detrainment depth
             
-                h_detrain  = hdetrainall.sel(lon=lon[o],lat=lat[a],method='nearest').isel(month=im).values.item(0)
+                h_detrain  = hdetrainall.sel(lon=lonf,lat=latf,method='nearest').isel(month=im).values.item(0)
                 zz_floor   = proc.get_nearest(h_detrain,z_t.values)
                 zz_ceil    = zz_floor # same depth for detrain
                 
@@ -368,19 +477,33 @@ for a in tqdm.tqdm(range(nlat)):
                 
                 corr_mon = corr_floor
             corr_out[im,a,o] = corr_mon.copy()
-            
+#%%
 # Save the output (for a variable and ensemble member)
-coords = dict(mon=np.arange(1,13,1),lat=lat,lon=lon)
-da_out = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
+if coords2D:
+    nlat       = np.arange(0,nlat)
+    nlon       = np.arange(0,nlon)
+    coords = dict(mon=np.arange(1,13,1),lat=nlat,lon=nlon)
+    da_corr = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
+    
+    da_out = xr.merge([da_corr,da_TLONG,da_TLAT,])
+else:
+    coords = dict(mon=np.arange(1,13,1),lat=lat,lon=lon)
+    
+    da_out = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
 edict  = {'lbd_d':{'zlib':True}}
-savename = "%sEN4_MIMOC_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,"TEMP","bilinear",lagmax,
+savename = "%s%s_MIMOC_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,"TEMP","RAW",lagmax,
                                                                                                   interpcorr,detrainceil,imshift,dtdepth,tstr)
 da_out.to_netcdf(savename,encoding=edict)                
 
 #%% Check Results
 
-for im in range(12):
-    da_out.isel(mon=im).plot(),plt.colorbar(),plt.show()
+if coords2D:
+    
+    for im in range(12):
+        plt.scatter(da_out.TLONG,da_out.TLAT,c=da_out.lbd_d.isel(mon=im),),plt.colorbar(),plt.show()
+else:
+    for im in range(12):
+        da_out.isel(mon=im).plot(),plt.colorbar(),plt.show()
 
 
 
