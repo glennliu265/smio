@@ -20,9 +20,7 @@ import sys
 import cartopy.crs as ccrs
 import glob
 import matplotlib as mpl
-
 import pandas as pd
-
 import scipy as sp
 
 #%% Import modules
@@ -65,7 +63,6 @@ proc.makedir(figpath)
 icemask = dl.load_mask("ERA5").mask
 plotmask = xr.where(np.isnan(icemask),0,icemask)
 
-
 # =========================
 #%% (1) Load ERA5 HFF
 # =========================
@@ -106,10 +103,10 @@ pilot      : Same as was used for the SSS Paper
 noPositive : Just set positive HFF to zero
 p10        : Use p = 0.10
 p20        : Use p = 0.20
-
+AConly     : Test Autocorrelation Only
 
 """
-signame = "noPositive"#"noPositive"#"pilot" #"noPositive" # 
+signame = "p10"#"noPositive"#"pilot" #"noPositive" # 
 print("Significance Testing Option is: %s" % (signame))
 
 hff   = damping_era5.copy()
@@ -138,7 +135,9 @@ elif signame == "p10":
     setdict['p'] = 0.10
 elif signame == "p20":
     setdict['p'] = 0.20
-
+elif signame == "AConly":
+    setdict['method'] = 2
+    
 # dof was set above
 
 # Compute and Apply Mask
@@ -219,13 +218,10 @@ for imon in range(12):
 
 #%% Check Points in SPGNE Region
 
-
 ilag      = 0
 plotvar   = hff.isel(lag=ilag).min('month') #dampingout.isel(month=imon)#
 
 isneg     = xr.where(plotvar<0,1,0)
-
-
 
 bbplot2   = [-50,0,50,65]
 
@@ -259,12 +255,6 @@ ax.set_title("ERA5 Minimum Heat Flux Feedback, Lag %02i\n%s" % (ilag+1,ptcount),
 
 figname = "%sHFF_Check_SPGNE_ERA5_%s_%s_monMIN_lag%i.png" % (figpath,flxname,signame,ilag+1)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
-
-
-#%%
-
-
-
 
 #%% Put into DataArray
 
@@ -405,10 +395,10 @@ ds_ice_out = xr.where(ds_ice == 1,np.nan,1)
 #%% (4) Do calculations for the forcing
 
 
-vname  = "QNET"
-
+vname   = "QNET"
+dampstr = "QNETpilotObsAConly"
 ncpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-ncname = "ERA5_Fprime_%s_timeseries_%spilotObs_nroll0_NAtl.nc" % (vname,vname)
+ncname = "ERA5_Fprime_%s_timeseries_%s_nroll0_NAtl.nc"  % (vname,dampstr) #"ERA5_Fprime_%s_timeseries_%spilotObs_nroll0_NAtl.nc" % (vname,vname)
 ds     = xr.open_dataset(ncpath+ncname).load()
 
 # COmpute the monthly standard deviation
@@ -419,17 +409,30 @@ dsmon = dsmon.rename(dict(month='mon'))
 #ds_ice_arr.plot()
 outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 edict   = proc.make_encoding_dict(dsmon)
-outname = outpath + "ERA5_Fprime_%s_std_pilot.nc" % vname
+outname = outpath + "ERA5_Fprime_%s_std_pilot.nc" % dampstr #vname
 dsmon.to_netcdf(outname,encoding=edict)
 
 #%% Repeat above but using qnet damping
 
 
-        
-        
-        
+#%% (5) ORAS5 Mixed-Layer Depths
+# Works with regridded climatology from regrid_subsurface_damping_era5
+
+ncname  = "ORAS5_CDS_mld_NAtl_1979_2024_scycle_regridERA5.nc"
+ncpath  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+ds      = xr.open_dataset(ncpath+ncname).load()
+
+mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+ncref   = mldpath + "MIMOC_regridERA5_h_pilot.nc"
+dsref   = xr.open_dataset(ncref).load()
 
 
+ds      = ds.rename(dict(mld='h',month='mon'))
+diff    = ds.h - dsref.h
+
+outname = mldpath + "ORAS5_CDS_regridERA5_h.nc"
+edict   = proc.make_encoding_dict(ds)
+ds.to_netcdf(outname,encoding=edict)
 
 #%%
 

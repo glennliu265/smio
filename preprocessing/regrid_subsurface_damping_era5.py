@@ -22,17 +22,19 @@ import cartopy.crs as ccrs
 
 #%% Load Files
 
-dataset_name = "ORAS5" # EN4
+dataset_name = "oras5_mld_clim_cds"
 
-
+#"ORAS5_avg" 
+# EN4
+#ORAS5
 # Load Subsurface Damping, estimated in [calc_subsurface_damping_en4.py]
 
 if dataset_name == "EN4":
     pathen4  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
     ncin    = pathen4 + "EN4_MIMOC_corr_d_TEMP_detrendbilinear_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2021.nc"
     dsen4    = xr.open_dataset(ncin).load().lbd_d
-    
-    ds_in    = ds_en4
+    vname = "lbd_d"
+    ds_in    = dsen4
     
     laten4 = dsen4.lat.data
     lonen4 = dsen4.lon.data
@@ -40,9 +42,9 @@ if dataset_name == "EN4":
     
 elif dataset_name == "ORAS5":
     path_ora = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-    ncin     = path_ora + "ORAS5_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2018.nc"
+    ncin     = path_ora + "ORAS5_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
     dsora    = xr.open_dataset(ncin).load()#.lbd_d
-    
+    vname = "lbd_d"
     ds_in = dsora
     
     tlat = dsora.TLAT.data
@@ -56,11 +58,46 @@ elif dataset_name == "ORAS5":
     ds_in = ds_in.drop(['nlat','nlon'])
     ds_in = ds_in.rename(dict(lat='nlat',lon='nlon'))
     
+elif dataset_name == "ORAS5_avg":
+    path_ora = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    ncin     = path_ora + "ORAS5_avg_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
+    dsora    = xr.open_dataset(ncin).load()#.lbd_d
+    vname = "lbd_d"
+    ds_in = dsora
+    
+    tlat = dsora.TLAT.data
+    tlon = dsora.TLONG.data
+    bbox = [np.nanmin(tlon.flatten()),
+            np.nanmax(tlon.flatten()),
+            np.nanmin(tlat.flatten()),
+            np.nanmax(tlat.flatten())]
+    
+    # Fix some issues with duplicate nlon.nlat
+    ds_in = ds_in.drop(['nlat','nlon'])
+    ds_in = ds_in.rename(dict(lat='nlat',lon='nlon'))
+elif dataset_name == "oras5_mld_clim_cds":
+    
+    
+    ncname = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    ncout  = "ORAS5_CDS_mld_NAtl_1979_2024_scycle.nc"
+    ncin    = ncname + ncout
+    ds_in     = xr.open_dataset(ncin)
+    
+    tlat = ds_in.TLAT.data
+    tlon = ds_in.TLONG.data
+    bbox = [np.nanmin(tlon.flatten()),
+            np.nanmax(tlon.flatten()),
+            np.nanmin(tlat.flatten()),
+            np.nanmax(tlat.flatten())]
+    vname = "mld"
+    
 else:
     
     print("Currently only supports the following datasets:\n")
     print("\tEN4")
     print("\tORAS5")
+    print("\tORAS5_avg")
+    print("\toras5_mld_clim_cds")
 
 # Load Lat and Lon from ERA5
 ncera5      = "ERA5_sst_NAtl_1979to2024.nc"
@@ -72,6 +109,10 @@ lonera5     = dsera5.lon.load()
 latera5     = dsera5.lat.load()
 
 
+#%% Examine a specific month (debugging for ORAS5)
+
+plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=11)),plt.colorbar(),plt.show()
+plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=9)),plt.colorbar(),plt.show()
 
 #%% Prepare Regridding
 
@@ -80,15 +121,15 @@ latera5     = dsera5.lat.load()
 if dataset_name == "ORAS5":
     ds_in = ds_in.rename({"TLONG": "lon", "TLAT": "lat",})
     
-
-
-
-method         = 'bilinear'
+method         = 'bilinear' #'bilinear'
 ds_out         = xr.Dataset({'lat': (['lat'], latera5.data), 'lon': (['lon'], lonera5.data) })
 regridder      = xe.Regridder(ds_in, ds_out, method)
 lbdd_regridded = regridder(ds_in)
+
+# Set incorrectly regridded estimates to zero
+lbdd_regridded = xr.where(lbdd_regridded ==0.,np.nan,lbdd_regridded)
 if dataset_name == "EN4": # Not sure if this is necessary, i guess i made it into a data array
-    lbdd_regridded = lbdd_regridded.rename('lbd_d')
+    lbdd_regridded = lbdd_regridded.rename(vname)
 
 
 #%%
@@ -102,7 +143,7 @@ def addstrtoext(name,addstr,adjust=0):
 
 
 ncout       = addstrtoext(ncin,"_regridERA5",adjust=-1)
-edict       = {'lbd_d' : {'zlib':True}}
+edict       = {vname : {'zlib':True}}
 lbdd_regridded.to_netcdf(ncout,encoding=edict)
 
 #%% Compare Regridding
