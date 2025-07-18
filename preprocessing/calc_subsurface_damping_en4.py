@@ -11,6 +11,7 @@ Update [2025.07.01], support ORAS5 Calculations
     - Used cropped region from [crop_oras5_natl]
     - Used regridded MLD to ERA5 resolution (MIMOC)
 
+Update [2025.07.09], Add ORAS5 2019-2025 with toggle
 
 Created on Tue Jun 24 13:10:54 2025
 
@@ -85,8 +86,33 @@ def fit_exp_ens(acfs_mon,lagmax):
 
 #%% Load Datasets (depending on dataset)
 
-dataset_name = "ORAS5" # EN4 # Indicate which Dataset
+"""
+Possible Dataset Names
 
+EN4
+- MIMOC MLDs
+- EN4...
+
+ORAS5
+- MIMOC MLD
+- ORAS opa0 1979-2018
+
+ORAS5_avg
+- MIMOC MLDs
+- ORAS5 average of opa0 to opa4, 1979-2024 (operational and consolidated)
+
+ORAS5_avg_mld003
+- ORAS5 MLD 0.03 threshold
+- Same votemper as ORAS5_avg
+
+
+"""
+
+
+dataset_name = "ORAS5_avg_mld003" # EN4 # Indicate which Dataset
+
+
+mldname = "MIMOC"
 st = time.time()
 if dataset_name == "EN4":
     # Load EN4 Profiles
@@ -110,8 +136,14 @@ elif dataset_name == "ORAS5":
     
     # Load ORAS5 Profiles
     oraspath = "/Users/gliu/Globus_File_Transfer/Reanalysis/ORAS5/proc/"
-    orasnc   = "ORAS5_TEMP_NAtl_1979_2018.nc"
+    orasnc   = "ORAS5_opa0_TEMP_NAtl_1979_2018.nc"
     ds_temp  = xr.open_dataset(oraspath + orasnc).TEMP.load()
+    
+    # Also load 2019-2024
+    orasnc2  = "ORAS5_CDS_TEMP_NAtl_2019_2024.nc"
+    ds_temp2 = xr.open_dataset(oraspath + orasnc2).TEMP.load()
+    ds_temp  = xr.concat([ds_temp,ds_temp2],dim='time')
+    
     
     # Load MIMOC (ERA5 Resolution)
     mimocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
@@ -120,7 +152,35 @@ elif dataset_name == "ORAS5":
     
     # Set Cropping Time Period
     tstart = 1979
-    tend   = 2018
+    tend   = 2024
+    bbcalc = [-40,-15,52,62]
+    
+    ds_temp = ds_temp.rename(dict(z_t='depth'))
+    
+elif dataset_name == "ORAS5_avg" or "ORAS5_avg_mld03":
+    
+    # Load ORAS5 Profiles
+    oraspath = "/Users/gliu/Globus_File_Transfer/Reanalysis/ORAS5/proc/"
+    orasnc   = "ORAS5_opaAVG_TEMP_NAtl_1979_2024.nc"
+    ds_temp  = xr.open_dataset(oraspath + orasnc).TEMP.load()
+    
+    if "mld003" in dataset_name:
+        print("Loading MLDs from ORAS (CDS, Ens 01")
+        mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+        mldnc    = "ORAS5_CDS_mld_NAtl_1979_2024_scycle.nc"
+        ds_mld   = xr.open_dataset(mldpath + mldnc).load()
+        mldname  = "ORAS5mld003"
+        
+    else:
+        print("Loading MLDs from MIMOC")
+        # Load MIMOC (ERA5 Resolution)
+        mimocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+        mimocnc   = "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
+        ds_mld    = xr.open_dataset(mimocpath + mimocnc).load()
+    
+    # Set Cropping Time Period
+    tstart = 1979
+    tend   = 2024
     bbcalc = [-40,-15,52,62]
     
     ds_temp = ds_temp.rename(dict(z_t='depth'))
@@ -130,10 +190,18 @@ else:
     print("Currently only supports the following datasets:\n")
     print("\tEN4")
     print("\tORAS5")
+    print("\tORAS5_avg")
     
     
 proc.printtime(st,print_str="Loaded")
 
+#%% Load ERA5 GMSST for detrending
+
+# Load GMSST For ERA5 Detrending
+detrend_obs_regression = True
+dpath_gmsst     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst        = "ERA5_GMSST_1979_2024.nc"
+ds_gmsst        = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
 
 
 #%% Detrainment calculation Options
@@ -149,13 +217,20 @@ nlags   = len(lags)
 lagmax  = 3
 
 # detrend = 'ensmean'
-
+detrend = 'gmsst' # Set to None to do a linear detrend
 
 
 #%% First, restrict MLD and calculate kprev
 
 # Slice to region (MLD)
-ds_mld = proc.sel_region_xr(ds_mld.mld,bbcalc) # Mon x Lat x Lon
+mld2d = False
+try:
+    ds_mld = proc.sel_region_xr(ds_mld.mld,bbcalc) # Mon x Lat x Lon
+except:
+    mld2d = True
+    print("Lon not found, trying curvilinear region selection...")
+    ds_mld = proc.sel_region_xr_cv(ds_mld,bbcalc)
+    
 
 # Slice to time (TEMP)
 ds_temp = ds_temp.sel(time=slice("%04i-01-01" % tstart,"%04i-12-31" % tend)) # [time x depth x lat x lon]
@@ -164,10 +239,13 @@ ds_temp = ds_temp.sel(time=slice("%04i-01-01" % tstart,"%04i-12-31" % tend)) # [
 if "TLONG" in ds_temp.coords:
     ds_temp = proc.sel_region_xr_cv(ds_temp,bbcalc,debug=False)
     
-
+    
 
 # Slice to max MLD Depth (take first level that exceeds deepest)
-max_mld             = np.ceil(np.nanmax(ds_mld.data.flatten()))
+if mld2d:
+    max_mld             = np.ceil(np.nanmax(ds_mld.mld.data.flatten()))
+else:
+    max_mld             = np.ceil(np.nanmax(ds_mld.data.flatten()))
 en4depths           = ds_temp.depth
 depthdiff           = en4depths.data - max_mld
 idx_deeper          = np.where(depthdiff>0)[0][0] # Find first index deeper than max climatological MLD
@@ -183,7 +261,11 @@ ds_temp = ds_temp.isel(depth=slice(0,idx_deeper+1))
 #%% Reprocess and detrend (took 82 sec for NATL ORAS5, 2.36 sec for SPGNE)
 
 dtvar_anom = proc.xrdeseason(ds_temp)
-dtvar_anom = proc.xrdetrend(dtvar_anom)
+if detrend == "gmsst":
+    dtout      = proc.detrend_by_regression(dtvar_anom,ds_gmsst)
+    dtvar_anom = dtout['TEMP']
+else:
+    dtvar_anom = proc.xrdetrend(dtvar_anom)
 
 
 #%% Retrieve Dimensions and reshape to year x mon
@@ -212,8 +294,12 @@ nyr                = int(ntime/12)
 dtvar_yrmon        = dtvar_anom.data.reshape((nyr,12,nz,nlat,nlon))
 
 # Looping will be done w.r.t. MLD coordinates
-lon_mld = ds_mld.lon
-lat_mld = ds_mld.lat
+if mld2d:
+    lon_mld = ds_mld.TLONG
+    lat_mld = ds_mld.TLAT
+else:
+    lon_mld = ds_mld.lon
+    lat_mld = ds_mld.lat
 
 
 #%% Calculate the ACF and detrainment (timescale-based)
@@ -251,7 +337,10 @@ for o in tqdm.tqdm(range(nlon)):
             print("Converting Longitude to degrees West")
             lonf = lonf - 360
         
-        hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
+        if mld2d:
+            hpt  = proc.find_tlatlon(ds_mld,lonf,latf,verbose=False).mld
+        else:
+            hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
         if np.any(np.isnan(hpt)):
             continue
         
@@ -325,7 +414,7 @@ else: # 1-D coorindates Case (EN4)
 
 
 edict      = proc.make_encoding_dict(ds_out)
-savename   = "%s%s_MIMOC_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,
+savename   = "%s%s_%s_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,mldname,
                                                                        'TEMP','linear',lagmax,tstr)
 ds_out.to_netcdf(savename,encoding=edict)
 
