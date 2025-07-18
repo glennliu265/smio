@@ -22,13 +22,14 @@ import cartopy.crs as ccrs
 
 #%% Load Files
 
-dataset_name = "oras5_mld_clim_cds"
+dataset_name = "ORAS5_avg_mld003"
 
+#"oras5_mld_clim_cds"
 #"ORAS5_avg" 
 # EN4
 #ORAS5
-# Load Subsurface Damping, estimated in [calc_subsurface_damping_en4.py]
 
+# Load Subsurface Damping, estimated in [calc_subsurface_damping_en4.py]
 if dataset_name == "EN4":
     pathen4  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
     ncin    = pathen4 + "EN4_MIMOC_corr_d_TEMP_detrendbilinear_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2021.nc"
@@ -90,6 +91,21 @@ elif dataset_name == "oras5_mld_clim_cds":
             np.nanmin(tlat.flatten()),
             np.nanmax(tlat.flatten())]
     vname = "mld"
+elif dataset_name == "ORAS5_avg_mld003":
+    
+    ncname = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    ncout  = "ORAS5_avg_mld003_ORAS5mld003_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
+    ncin    = ncname + ncout
+    ds_in     = xr.open_dataset(ncin)
+    
+    tlat = ds_in.TLAT.data
+    tlon = ds_in.TLONG.data
+    bbox = [np.nanmin(tlon.flatten()),
+            np.nanmax(tlon.flatten()),
+            np.nanmin(tlat.flatten()),
+            np.nanmax(tlat.flatten())]
+    vname = "lbd_d"
+    
     
 else:
     

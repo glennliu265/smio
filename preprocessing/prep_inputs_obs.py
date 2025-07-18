@@ -434,6 +434,28 @@ outname = mldpath + "ORAS5_CDS_regridERA5_h.nc"
 edict   = proc.make_encoding_dict(ds)
 ds.to_netcdf(outname,encoding=edict)
 
+#%% Compute Kprev
+
+# Compute kprev for ens-mean mixed layer depth cycle
+infunc     = lambda x: scm.find_kprev(x,debug=False,returnh=False)
+st         = time.time()
+
+kprevall = xr.apply_ufunc(
+    infunc, # Pass the function
+    ds, # The inputs in order that is expected
+    input_core_dims =[['mon'],], # Which dimensions to operate over for each argument... 
+    output_core_dims=[['mon'],], # Output Dimension
+    vectorize=True, # True to loop over non-core dims
+    )
+print("Completed kprev calc in %.2fs" % (time.time()-st))
+
+kprevall   = kprevall.transpose('mon','lat','lon').rename(dict(h='kprev'))
+edict      = proc.make_encoding_dict(kprevall)
+outname = mldpath + "ORAS5_CDS_regridERA5_kprev.nc"
+kprevall.to_netcdf(outname,encoding=edict)
+
+
+
 #%%
 
 

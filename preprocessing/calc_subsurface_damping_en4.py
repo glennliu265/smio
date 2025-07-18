@@ -483,8 +483,11 @@ for a in tqdm.tqdm(range(nlat)):
         if lon360_flag and lonf > 180:
             print("Converting Longitude to degrees West")
             lonf = lonf - 360
-            
-        hpt    = ds_mld.sel(lon=lonf,lat=latf,method='nearest')
+        
+        if mld2d:
+            hpt  = proc.find_tlatlon(ds_mld,lonf,latf,verbose=False).mld
+        else:
+            hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
         if np.all(np.isnan(hpt)): # Skip for land point
             continue
         
@@ -492,7 +495,10 @@ for a in tqdm.tqdm(range(nlat)):
         immin = hpt.argmin().values.item()
         
         # Compute kprev for the ensemble member
-        kprev   = kprevall.sel(lon=lonf,lat=latf,method='nearest').values
+        if mld2d:
+            kprev   = proc.find_tlatlon(kprevall,lonf,latf).mld.data
+        else:
+            kprev   = kprevall.sel(lon=lonf,lat=latf,method='nearest').values
         
         for im in range(12):
             detrain_mon = kprev[im]
@@ -527,8 +533,10 @@ for a in tqdm.tqdm(range(nlat)):
             
             # First, get the depths
             if dtdepth: # Just retrieve at the detrainment depth
-            
-                h_detrain  = hdetrainall.sel(lon=lonf,lat=latf,method='nearest').isel(month=im).values.item(0)
+                if mld2d:
+                    h_detrain  = proc.find_tlatlon(kprevall,lonf,latf).mld.isel(month=im).values.item(0)
+                else:
+                    h_detrain  = hdetrainall.sel(lon=lonf,lat=latf,method='nearest').isel(month=im).values.item(0)
                 zz_floor   = proc.get_nearest(h_detrain,z_t.values)
                 zz_ceil    = zz_floor # same depth for detrain
                 
@@ -580,7 +588,7 @@ else:
     
     da_out = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
 edict  = {'lbd_d':{'zlib':True}}
-savename = "%s%s_MIMOC_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,"TEMP","RAW",lagmax,
+savename = "%s%s_%s_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,mldname,"TEMP","RAW",lagmax,
                                                                                                   interpcorr,detrainceil,imshift,dtdepth,tstr)
 da_out.to_netcdf(savename,encoding=edict)                
 
