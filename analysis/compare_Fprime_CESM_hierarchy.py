@@ -27,7 +27,6 @@ import os
 import tqdm
 import time
 
-
 #%%
 
 # local device (currently set to run on Astraeus, customize later)
@@ -107,11 +106,30 @@ for ex in tqdm.tqdm(range(nexps)):
     ds_exp = proc.sel_region_xr(ds_exp,bbox_natl)
     vars_byexp.append(ds_exp)
 
+#%% Also load no ENSO case
+enso_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/anom/"
+
+enso_ncs = ["CESM2_SOM_SHF_NAtl_0060to0360_detrend1_ENSOrem_lag1_pcs3_monwin3.nc",
+            "CESM2_MCOM_SHF_NAtl_0100to0500_detrend1_ENSOrem_lag1_pcs3_monwin3.nc",
+            "CESM2_FOM_SHF_NAtl_0200to2000_detrend1_ENSOrem_lag1_pcs3_monwin3.nc"]
+
+
+flx_noenso = [xr.open_dataset(enso_path + nc).load() for nc in enso_ncs]
+#"CESM2_SOM_SHF_detrend1_ENSOcmp_lag1_pcs3_monwin3_0060to0360.nc"
+#"CESM2_MCOM_SHF_detrend1_ENSOcmp_lag1_pcs3_monwin3_0100to0500.nc"
+#"CESM2_FOM_SHF_detrend1_ENSOcmp_lag1_pcs3_monwin3_0200to2000.nc"
+
+
+# Preprocess this
+ds_flx_noenso      = [proc.check_flx(flx_noenso[ex],flxname=flxnames[ex],bbox_gs=bbox_gs) for ex in range(3)]
+ds_flx_noenso      = [preproc(ds_flx_noenso[ex][flxnames[ex]],tstarts[ex],tends[ex]) for ex in range(3)]
+
+
 #%% Load Ice Mask for analysis
 
-maskpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
-masknc   = "cesm2_pic_limask_0.3p_0.05p_0200to2000.nc"
-dsmask   = xr.open_dataset(maskpath+masknc).load()
+maskpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
+masknc    = "cesm2_pic_limask_0.3p_0.05p_0200to2000.nc"
+dsmask    = xr.open_dataset(maskpath+masknc).load()
 dsmask180 = proc.lon360to180_xr(dsmask)
 bbreg     = proc.get_bbox(ds_sst)
 dsmask180 = proc.sel_region_xr(dsmask180,bbreg).mask
@@ -119,17 +137,17 @@ dsmask180 = proc.sel_region_xr(dsmask180,bbreg).mask
 
 #%% Also open view of ERA5 for analysis (this might get a bit large...)
 
-ncflx_era   = "ERA5_qnet_NAtl_1979to2024.nc"
-pathflx_era = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-flx_era     = xr.open_dataset(pathflx_era+ncflx_era)['qnet']
+ncflx_era       = "ERA5_qnet_NAtl_1979to2024.nc"
+pathflx_era     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+flx_era         = xr.open_dataset(pathflx_era+ncflx_era)['qnet']
 
-ncfp_era    = "ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
-pathfp_era  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-fprime_era  = xr.open_dataset(pathfp_era+ncfp_era)['Fprime']#.load()
+ncfp_era        = "ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
+pathfp_era      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+fprime_era      = xr.open_dataset(pathfp_era+ncfp_era)['Fprime']#.load()
 
-ncsst_era   = "ERA5_sst_NAtl_1979to2024.nc"
-pathsst_era = pathflx_era
-sst_era     = xr.open_dataset(pathsst_era+ncsst_era)['sst']
+ncsst_era       = "ERA5_sst_NAtl_1979to2024.nc"
+pathsst_era     = pathflx_era
+sst_era         = xr.open_dataset(pathsst_era+ncsst_era)['sst']
 
 # Load GMSST For ERA5 Detrending
 detrend_obs_regression = True
@@ -148,14 +166,18 @@ ds_gmsst        = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
 # ============================
 
 bbsel        = [-40,-15,52,62]
+#bbsel = [-60,-20,40,60]
 bbfn,bbtitle = proc.make_locstring_bbox(bbsel)
 
-aavg_byvar = []
+
+dsreg_byvar = []
+aavg_byvar  = []
 for ex in range(nexps):
     dsreg       = proc.sel_region_xr(vars_byexp[ex],bbsel)
     dsreg_mask  = dsreg * dsmask180
     aavg        = proc.area_avg_cosweight(dsreg_mask)
     aavg_byvar.append(aavg)
+    dsreg_byvar.append(dsreg)
 
 #% Process and compute ERA5 =======
 
@@ -336,7 +358,7 @@ for vv in range(3):
         ax2.set_xlabel("Period (Years)",fontsize=14)
         cfloc = 1e-1
     else:
-        ax.set_ylim([1e2,1e4])
+        ax.set_ylim([1e1,1e4])
         cfloc = 1e3
     
     if vv == 2:
@@ -355,6 +377,219 @@ for vv in range(3):
 
 figname = "%sPower_Spectra_CESM2_Hierarchy_%s.png" % (figpath,bbfn)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Do Monte Carlo Testing for a selected spectra
+
+sample_len = len(flxs[-1])
+niter      = 10000
+spec_byexp = []
+
+start_jan = False #  Current issue with jan starts.... (exceed indices)
+
+nsmooth_era =6
+spec_byexp = []
+for ex in range(nexps):
+    
+    
+    tsfull = flxs[ex]
+    if start_jan: 
+        nstarts = np.arange(0,len(tsfull)-int(sample_len/12)-12,12)
+    else:
+        nstarts = np.arange(0,len(tsfull)-sample_len-1)
+    
+    
+    spec_all = []
+    
+    istarts = np.random.choice(nstarts,niter)
+    for mc in tqdm.tqdm(range(niter)):
+        
+        seg_id = np.arange(istarts[mc],istarts[mc]+sample_len)
+        seg    = tsfull[seg_id]
+        mout = scm.quick_spectrum([seg],nsmooth_era,0.10,return_dict=True)
+        spec_all.append(mout['specs'][0])
+        
+        #mout   = scm.compute_sm_metrics([seg],nsmooth=nsmooth_era)
+        #spec_all.append(mout['specs'][0])
+    
+    spec_byexp.append(np.array(spec_all))
+
+#%% Plot same as above but with error bars
+
+def get95conf(samples,axis):
+    return np.quantile(samples,[0.025,0.975],axis=axis)
+
+plot_separate = True
+
+# Select variable to plot
+invars      = [ssts,flxs,fprimes]
+vv          = 1
+metrics_out = inmetrics[vv]
+
+if not plot_separate:
+    fig,ax = plt.subplots(1,1,figsize=(10,4.5),constrained_layout=True)
+
+    for ii in range(nexps_loop):
+        plotspec = metrics_out['specs'][ii] / dtmon_fix
+        plotfreq = metrics_out['freqs'][ii] * dtmon_fix
+        CCs      = metrics_out['CCs'][ii] / dtmon_fix
+        
+        color_in = expcols[ii]
+        
+        if ii <  3:
+            inconf          = spec_byexp[ii].squeeze()
+            conf95          = get95conf(inconf,0) / dtmon_fix
+            conffreq        = metrics_out['freqs'][-1] * dtmon_fix
+            muconf          = inconf.mean(0) / dtmon_fix
+            ax.plot(conffreq,muconf,c=color_in,marker="x",markersize=2.5,ls="dashed")
+            ax.fill_between(conffreq,conf95[0,:],conf95[1,:],alpha=0.2,color=color_in,zorder=-1)
+        
+        
+        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_plot[ii],c=color_in,marker="x",markersize=2.5)
+        
+        
+        
+        # # Plot Confidence Interval (ERA5)
+        # idof            = ii
+        # alpha           = 0.05
+        # cloc_era        = [1e-2+(ii*.25e-2),cfloc]
+        # dof_fom         = metrics_out['dofs'][idof] # dof_dummy[ii] #
+        # cbnds_era       = proc.calc_confspec(alpha,dof_fom)
+        # proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=expcols[idof],cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+        
+        
+        
+        
+        #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
+        #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
+    
+    ax.set_xlim([1/1000,0.5])
+    ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+    
+    
+    ax.set_ylabel("Power [$%s ^2 cycle \, per \, mon$]" % vunits[vv])
+    
+    ax2 = ax.twiny()
+    ax2.set_xlim([1/1000,0.5])
+    ax2.set_xscale('log')
+    ax2.set_xticks(xper_ticks,labels=xper)
+    
+    
+    if vv == 0:
+        ax.set_ylim([1e-3,1e2])
+        ax2.set_xlabel("Period (Years)",fontsize=14)
+        cfloc = 1e-1
+    else:
+        ax.set_ylim([1e2,1e4])
+        cfloc = 1e3
+    
+    if vv == 2:
+        ax.set_xlabel("Frequency (1/Month)",fontsize=14)
+        ax.legend()
+    
+    # Plot Confidence Interval (ERA5)
+    idof            = 2
+    alpha           = 0.05
+    cloc_era        = [1e-2,cfloc]
+    dof_fom         = metrics_out['dofs'][idof]
+    cbnds_era       = proc.calc_confspec(alpha,dof_fom)
+    proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=expcols[idof],cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+    
+    
+    figname = "%sPower_Spectra_Conf_CESM2_Hierarchy_%s.png" % (figpath,bbfn)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+else:
+    print("Plotting_Separately)")
+    always_plot_ex = [0,3]
+    loop_ex        = [1,2]
+    
+    for li in range(len(loop_ex)): # Initialize plot for each experiment
+    
+        ii_targ         = loop_ex[li]
+        loop_indices    = always_plot_ex + [ii_targ,]
+        
+    
+        fig,ax = plt.subplots(1,1,figsize=(10,4.5),constrained_layout=True)
+        
+        for nn in range(len(loop_indices)):
+            ii       = loop_indices[nn]
+            
+            plotspec = metrics_out['specs'][ii] / dtmon_fix
+            plotfreq = metrics_out['freqs'][ii] * dtmon_fix
+            CCs      = metrics_out['CCs'][ii] / dtmon_fix
+            
+            color_in = expcols[ii]
+            
+            
+                
+            if ii < 3: # Plot Confidence Intervals
+                inconf          = spec_byexp[ii].squeeze()
+                conf95          = get95conf(inconf,0) / dtmon_fix
+                conffreq        = metrics_out['freqs'][-1] * dtmon_fix
+                muconf          = inconf.mean(0) / dtmon_fix
+                ax.plot(conffreq,muconf,c=color_in,ls="dashed")
+                #if ii ==
+                
+                ax.plot(conffreq,conf95[0,:],color=color_in,zorder=-1,ls='dashed',alpha=0.5,lw=.5)
+                ax.plot(conffreq,conf95[1,:],color=color_in,zorder=-1,ls='dashed',alpha=0.5,lw=.5)
+                ax.fill_between(conffreq,conf95[0,:],conf95[1,:],alpha=0.1,color=color_in,zorder=-1)
+                
+                
+            ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_plot[ii],c=color_in)
+            
+            
+        
+        
+        ax.set_xlim([1/1000,0.5])
+        ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+        ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+        ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+        ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+        ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+    
+    
+        ax.set_ylabel("Power [$%s ^2 cycle \, per \, mon$]" % vunits[vv])
+        
+        ax2 = ax.twiny()
+        ax2.set_xlim([1/1000,0.5])
+        ax2.set_xscale('log')
+        ax2.set_xticks(xper_ticks,labels=xper)
+        
+    
+        #if vv == 1:
+        ax.set_ylim([1e-3,1e2])
+        ax2.set_xlabel("Period (Years)",fontsize=14)
+        cfloc = 1e-1
+        
+        ax.set_ylim([1e2,1e5])
+        cfloc = 1e3
+        
+        ax.set_xlabel("Frequency (1/Month)",fontsize=14)
+        
+        
+                
+        # Plot Confidence Interval (ERA5)
+        idof            = 3
+        alpha           = 0.05
+        cloc_era        = [5e-3,2e4]
+        dof_fom         = metrics_out['dofs'][idof]
+        cbnds_era       = proc.calc_confspec(alpha,dof_fom)
+        proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=expcols[idof],cflabel=r"95% Confidence (ERA5)") #+r" (dof= %.2f)" % dof_era)
+        
+        ax.legend()
+        
+        
+        figname = "%sPower_Spectra_Conf_CESM2_Hierarchy_%s_loop%i.png" % (figpath,bbfn,li)
+        plt.savefig(figname,dpi=150,bbox_inches='tight')
+        
+    
+
+
+
+#%% ===========================================================================
 
 
 #%% Briefly Check the Persistence
@@ -462,26 +697,34 @@ def get_leadlags(sstin,flxin):
 win          = 11
 ann_byvar    = []
 ann_byvar_lp = []
+ann_byvar_hp = []
 for vv in range(3):
     vname     = vnames[vv]
     dsin      = [ds[vname] for ds in aavg_byvar]
     dsann     = [calc_ann_avg(ds) for ds in dsin]
     dsann_lp  = [movmean(ds,win) for ds in dsann]
+    dsann_hp  = [dsann[ex] - dsann_lp[ex] for ex in range(4)]
     
     ann_byvar.append(dsann)
     ann_byvar_lp.append(dsann_lp)
+    ann_byvar_hp.append(dsann_hp)
     
     
 
 
-leadlags_qnet       = [get_leadlags(ann_byvar[0][ex],ann_byvar[1][ex]) for ex in range(4)]
-leadlags_qnet_lp    = [get_leadlags(ann_byvar_lp[0][ex],ann_byvar_lp[1][ex]) for ex in range(4)]
+leadlags_qnet       = [get_leadlags(ann_byvar[1][ex],ann_byvar[0][ex]) for ex in range(4)]
+leadlags_qnet_lp    = [get_leadlags(ann_byvar_lp[1][ex],ann_byvar_lp[0][ex]) for ex in range(4)]
+leadlags_qnet_hp    = [get_leadlags(ann_byvar_hp[1][ex],ann_byvar_hp[0][ex]) for ex in range(4)]
 
-leadlags_fprime     = [get_leadlags(ann_byvar[0][ex],ann_byvar[2][ex]) for ex in range(4)]
-leadlags_fprime_lp  = [get_leadlags(ann_byvar_lp[0][ex],ann_byvar_lp[2][ex]) for ex in range(4)]
+leadlags_fprime     = [get_leadlags(ann_byvar[2][ex],ann_byvar[0][ex]) for ex in range(4)]
+leadlags_fprime_lp  = [get_leadlags(ann_byvar_lp[2][ex],ann_byvar_lp[0][ex]) for ex in range(4)]
+leadlags_fprime_hp  = [get_leadlags(ann_byvar_hp[2][ex],ann_byvar_hp[0][ex]) for ex in range(4)]
+
 
 #%% Make Some Plots
 
+usehp   = True
+varplot = "Qnet"#"Fprime"#
 xtks    = np.arange(-10,11,1)
 
 fig,axs = plt.subplots(1,2,figsize=(12.5,4.5),constrained_layout=True)
@@ -491,12 +734,25 @@ for aa in range(2):
     ax = axs[aa]
     
     if aa == 0:
+        if varplot == "Fprime":
+            if usehp:
+                corrin = leadlags_fprime_hp
+            else:
+                corrin = leadlags_fprime
+        elif varplot == "Qnet":
+            if usehp:
+                corrin = leadlags_qnet_hp
+            else:
+                corrin = leadlags_qnet
         #corrin = leadlags_qnet
-        corrin = leadlags_fprime
+        
         title  = "Raw"
     else:
-        #corrin = leadlags_qnet_lp
-        corrin = leadlags_fprime_lp
+        if varplot == "Fprime":
+            corrin = leadlags_fprime_lp
+        else:
+            corrin = leadlags_qnet_lp
+            
         title  = "%i-Year Running Mean" % win
         
         
@@ -505,7 +761,7 @@ for aa in range(2):
 
         plotcorr = corrin[ex]
         
-        plotcorr = plotcorr * -1
+        plotcorr = plotcorr #* -1
         # if ex < 3:
         #     plotcorr = plotcorr * -1
         ax.plot(plotcorr.lag,plotcorr,c=expcols[ex],label=expnames_plot[ex],marker='o')
@@ -520,8 +776,56 @@ for aa in range(2):
     ax.set_xticks(xtks)
         
 
+figname = "%sLeadLagCorr_CESM2_Hierarchy_%s_%s_usehp%i.png" % (figpath,bbfn,varplot,usehp)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
 
+#%% Recreate plots from O'Reilly 2016, qnet and sst
+
+# ex      = 0
+# winlens = np.arange(3,16,1)
+# nwin    = len(winlens)
+
+
+# for ww in range(nwin):
     
+#     ds_in     = aavg_byvar[ex]
+#     dsann     = [calc_ann_avg(ds) for ds in dsin]
+#     dsann_lp  = [movmean(ds,win) for ds in dsann]
+#     dsann_hp  = [dsann[ex] - dsann_lp[ex] for ex in range(4)]
+    
+
+
+
+#%% Briefly Check the spatial pattern
+
+vv    = 1
+itime = 5
+
+fig,axs= plt.subplots(4,1,subplot_kw={'projection':ccrs.PlateCarree()})
+
+for ex in range(4):
+    
+    
+    if ex < 3:
+        plotvar = dsreg_byvar[ex][vnames[vv]].isel(time=itime)#mean('time')
+    else:
+        plotvar = proc.sel_region_xr(era_reg[vv],bbsel)#.mean('time')
+        plotvar = proc.xrdeseason(era_reg[vv]) # Note: NOT DETRENDED
+        
+        plotvar = plotvar.isel(time=itime)#mean('time')
+    
+    ax = axs[ex]
+    ax.coastlines()
+    ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-50,vmax=50,cmap='cmo.balance')
+
+
+#%% Try regression 
+
+
+
+
+
+
 #%% Compute Lag Relationships
 
 
@@ -590,9 +894,6 @@ for vv in range(3):
     figname = "%sLog_ratio_%s_%s_to_%s_%s.png" % (figpath,bbfn,expnames[iinumer],expnames[iidenom],vnames[vv])
     plt.savefig(figname,dpi=150,bbox_inches='tight')
 
-
-
-
 #%% Do a quick EOF Analysis (on Fprime)
 
 dsmask_natl = proc.sel_region_xr(dsmask180,bbox_natl)
@@ -636,11 +937,9 @@ for ex in range(3):
     # # if ex == 2:
     # #     plotvar = plotvar*-1
     # if ex == 0:
-    #     plotvar = plotvar*-1
-        
+    #     plotvar = plotvar*-1   
     
     pcm       = ax.pcolormesh(lon,lat,plotvar,cmap='cmo.balance',vmin=-vmax,vmax=vmax,transform=proj)
-    
     
     
 cb = viz.hcbar(pcm,ax=axs.flatten(),fontsize=fsz_tick)
@@ -651,7 +950,83 @@ plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 #%%
 
+#%% Check Qnet spectra with and without ENSO
+
+
+bbsel_enso          = [-40,-15,52,62]
+nsmooths            = [24,24,200]
+
+vv                  = 1
+
+
+specout_byexp = []
+for ex in range(3):
+    nsmooth = nsmooths[ex]
+    
+    flx0            = ds_flx_noenso[ex]
+    flx1            = vars_byexp[ex].SHF
+    invars          = [flx0,flx1]
+    invars_reg      = [proc.sel_region_xr(ff,bbsel_enso) for ff in invars]
+    invars_reg      = [proc.area_avg_cosweight(ff) for ff in invars_reg]
+    invars_arr      = [iv.data for iv in invars_reg]
+    
+    specout         = scm.quick_spectrum(invars_arr,nsmooth,pct=0.10,return_dict=True)
+
+    specout_byexp.append(specout)
+
 #%%
+
+
+fig,axs = plt.subplots(3,1,figsize=(8,8),constrained_layout=True)
+
+
+for ex in range(3):
+    ax = axs[ex]
+    expnames_enso = ["No ENSO","With ENSO"]
+    els           = ['dashed','solid']
+    
+    dtmon_fix       = 60*60*24*30
+    xper            = np.array([40,10,5,1,0.5])
+    xper_ticks      = 1 / (xper*12)
+    specout         = specout_byexp[ex]
+    
+    for ii in range(2):
+        
+        plotspec = specout['specs'][ii] / dtmon_fix
+        plotfreq = specout['freqs'][ii] * dtmon_fix
+        
+        
+        color_in = expcols[ex]
+        
+        ax.loglog(plotfreq,plotspec,lw=1,label=expnames_enso[ii],c=color_in,
+                  ls=els[ii],markersize=2.5)
+        
+        
+    ax.set_xlim([1/1000,0.5])
+    ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+    
+    
+    ax.set_ylabel("Power [$%s ^2 cycle \, per \, mon$]" % vunits[vv])
+    
+    ax2 = ax.twiny()
+    ax2.set_xlim([1/1000,0.5])
+    ax2.set_xscale('log')
+    ax2.set_xticks(xper_ticks,labels=xper)
+    
+    ax.legend()
+    ax.set_title("Power Spectra, %s, nsmooth=%i" % (expnames_long[ex],nsmooths[ex]))
+    
+    
+    
+    
+#%%
+
+
+
 
 
 
