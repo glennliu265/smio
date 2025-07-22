@@ -40,11 +40,20 @@ import cvd_utils as cvd
 
 #%% Load ERA5 SST and Ice Cover
 
-dpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
 
+
+# Case for 1979 to 2024
+dpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
 ncsst = dpath + "sst_1979_2024.nc"
 ncice = dpath + "siconc_1979_2024.nc"#"ERA5_siconc_1940_2024_NATL.nc"
+outname  = "%sERA5_GMSST_1979_2024.nc" % (dpath)
 
+# Case for 1940 to 1979
+dpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/ERA5/"
+dpath_out = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+ncsst = dpath + "sst_1940_1978.nc"
+ncice = dpath + "siconc_1940_1978.nc"
+outname  = "%sERA5_GMSST_1940_1978.nc" % (dpath_out)
 
 # Load SST
 ds_sst = xr.open_dataset(ncsst).sst.load()#.sst
@@ -120,10 +129,8 @@ dsout           = [aavgs_ds[ex].rename(expnames_out[ex]) for ex in range(3)]
 dsout           = xr.merge(dsout)
 
 
-outname         = "%sERA5_GMSST_1979_2024.nc" % (dpath)
 edict           = proc.make_encoding_dict(dsout)
 dsout.to_netcdf(outname,encoding=edict)
-
 
 
 #%%
