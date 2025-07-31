@@ -166,8 +166,8 @@ fsz_ticks = 18
 # regpat  = mon1['intercept']
 # regpat0 = mon0['intercept']
 
-vmax    = 6
-regpat  = mon1['regression_pattern']
+vmax     = 6
+regpat   = mon1['regression_pattern']
 
 for im in range(12):
     
@@ -214,22 +214,97 @@ ax.set_title("All Months Regression",fontsize=fsz_title)
 figname = "%sGMSST_Regression_Year_%sto%s_ALL_Month.png" % (figpath,ystart,yend)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
+
+#%% Ideas:
+    
+"""
+(1) Plot seasonal differences in regression coefficient
+(2) Plot differences from the all-regression
+
+"""
+
+
+#%% Idea (1), Look at where there is the largest (mean) difference with all-months
+
+regpat0 = mon0['regression_pattern']
+regpat1 = mon1['regression_pattern']
+rmse    = np.sqrt(((regpat1 - regpat0)**2).mean('mon'))
+
+vmax    = 2
+
+fig,ax,_ = viz.init_regplot()
+plotvar  = rmse
+cints = np.arange(0,2.4,.4)
+
+pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    vmin=0,vmax=vmax,cmap='cmo.matter')
+
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    levels=cints,colors="k",linewidths=0.55)
+clbl = ax.clabel(cl,fontsize=12)
+viz.add_fontborder(clbl,w=2)
+
+cb = viz.hcbar(pcm,ax=ax)
+cb.ax.tick_params(labelsize=fsz_ticks)
+cb.set_label("Regression Slope RMSE (Seperate Month - All Month)",fontsize=fsz_ticks)
+#ax.set_title("",fontsize=fsz_title)
+
+figname = "%sGMSST_Regression_Year_%sto%s_RMSE_Comparison.png" % (figpath,ystart,yend)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Idea (2) Look at location with largest seasonal range
+#rmse    = np.sqrt(((regpat1 - regpat0)**2).mean('mon'))
+
+srange = regpat1.max('mon') - regpat1.min('mon')
+
+vmax    = 6
+
+fig,ax,_ = viz.init_regplot()
+plotvar  = srange
+cints = np.arange(0,8,1)
+
+pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    vmin=0,vmax=vmax,cmap='cmo.turbid')
+
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    levels=cints,colors="k",linewidths=0.55)
+# clbl = ax.clabel(cl,fontsize=8)
+# viz.add_fontborder(clbl,w=2)
+
+cb = viz.hcbar(pcm,ax=ax)
+cb.ax.tick_params(labelsize=fsz_ticks)
+cb.set_label("Seasonal Range in Regression Slope",fontsize=fsz_ticks)
+#ax.set_title("",fontsize=fsz_title)
+
+figname = "%sGMSST_Regression_Year_%sto%s_Seasonal_Range_SepMon.png" % (figpath,ystart,yend)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+# =================
+#%% Point Analysis
+# =================
+"""
+
+In this section, we examine effects of regressing out GMSST at a selected point
+and sensitivity to using All Months vs Separate months...
+
+"""
+
+
+
 #%% Check Timeseries Removal At a Point
 
-lonf            = -37
+lonf            = -73
 latf            = 37
 locfn,loctitle  = proc.make_locstring(lonf,latf)
 
-loopds = [mon0,mon1]
-cols = ['cornflowerblue','hotpink']
-loopnames = ["All Month","Seperate Month"]
+loopds          = [mon0,mon1]
+cols            = ['cornflowerblue','hotpink']
+loopnames       = ["All Month","Seperate Month"]
 
-loopname_short = ["AllMon","SepMon"]
+loopname_short  = ["AllMon","SepMon"]
 
-
-
-
-
+ymax            = 7.5
 
 # PLot GMSST removal
 for ii in range(2):
@@ -253,7 +328,7 @@ for ii in range(2):
     #ax.plot(xrange,fitpt,color=cols[ii],ls='dashed')
     ax.legend(fontsize=14,ncol=2)
     ax.axhline([0],color='k',lw=0.44)
-    ax.set_ylim([-2.5,2.5])
+    ax.set_ylim([-ymax,ymax])
     ax.set_ylabel("SST (degC)",fontsize=14)
     ax.set_xlim([sstpt.time.isel(time=0),sstpt.time.isel(time=-1)])
     ax.tick_params(labelsize=14)
@@ -261,132 +336,128 @@ for ii in range(2):
     
     figname = "%sGMSST_Regression_Timeseries_%s_%s.png" % (figpath,locfn,loopname_short[ii])
     plt.savefig(figname,dpi=150,bbox_inches='tight')
-    
-#%% Examine Impact on SST
 
-sstin = [proc.selpt_ds(mon0.sst,lonf,latf).data,proc.selpt_ds(mon1.sst,lonf,latf).data]
+
+
+#%% Check Regression Coefficients    
+
+coeffs = [proc.selpt_ds(ds.regression_pattern,lonf,latf) for ds in loopds]
+
+fig,ax = viz.init_monplot(1,1,figsize=(6,4))
+
+
+ax.plot(mons3,coeffs[1].data,c=cols[1],label=loopnames[1],lw=2.5)
+
+
+allmonval = coeffs[0].data.item()
+lab = r"%s ($\beta=%.2f$)" % (loopnames[0],allmonval)
+ax.axhline(allmonval,c=cols[0],label=lab,lw=2.5)
+ax.set_ylabel("degC per degC GMSST")
+
+ax.axhline([0],c="k",label="",lw=1)
+ax.set_ylim([-10,10])
+
+ax.legend()
+
+#%% Examine Impact on SST, calculate some metrics
+
+sstraw_pt   = proc.selpt_ds(dsanom,lonf,latf).data
+nsmooth     = 5
+sstin       = [proc.selpt_ds(mon0.sst,lonf,latf).data,proc.selpt_ds(mon1.sst,lonf,latf).data]
+tsm         = scm.compute_sm_metrics(sstin,lags=lags,nsmooth=nsmooth,detrend_acf=False)
+tsmlin      = scm.compute_sm_metrics([sstraw_pt,],lags=lags,nsmooth=nsmooth,detrend_acf=True)
+tsmraw      = scm.compute_sm_metrics([sstraw_pt,],lags=lags,nsmooth=nsmooth,detrend_acf=False)
+
+
+#%% Plot the ACF
+
+kmonth = 1
+xtks   = lags[::3]
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4.5))
+ax,_ = viz.init_acplot(kmonth,xtks,lags,ax=ax)
+
+plotvar = tsmraw['acfs'][kmonth][0]
+ax.plot(lags,plotvar,label="SST Anomaly Raw",lw=2.5,c="midnightblue")
+
+
+plotvar = tsmlin['acfs'][kmonth][0]
+ax.plot(lags,plotvar,label="Linear Detrend By Month",lw=2.5,c="red")
+
+for ii in range(2):
+    plotvar = tsm['acfs'][kmonth][ii]
+    lab = "Regress GMSST (%s)" % loopnames[ii]
+    ax.plot(lags,plotvar,label=lab,lw=2.5,c=cols[ii])
+
+ax.legend()
+
+#%% Take a look at the spectra
+
+
+vunit           = "degC"
+dtmon_fix       = 60*60*24*30
+xper            = np.array([40,10,5,1,0.5])
+xper_ticks      = 1 / (xper*12)
+
+
+fig,ax = plt.subplots(1,1,figsize=(8,4.5),constrained_layout=True)
+
+for ii in range(2):
+    
+    plotspec = tsm['specs'][ii] / dtmon_fix
+    plotfreq = tsm['freqs'][ii] * dtmon_fix
+    
+    
+    color_in =cols[ii]
+    
+    ax.loglog(plotfreq,plotspec,lw=2.5,label=loopnames[ii],c=color_in,
+              ls='solid',markersize=2.5)
+
+
+# Also Plot other cases
+plotspec = tsmraw['specs'][0] / dtmon_fix
+plotfreq = tsmraw['freqs'][0] * dtmon_fix
+ax.loglog(plotfreq,plotspec,lw=2.5,label='Raw Anomaly',c='k',
+          ls='dashed',markersize=2.5)
+
+
+# Also Plot other cases
+plotspec = tsmlin['specs'][0] / dtmon_fix
+plotfreq = tsmlin['freqs'][0] * dtmon_fix
+ax.loglog(plotfreq,plotspec,lw=2.5,label="Linear Detrend By Month",c='r',
+          ls='dotted',markersize=2.5)
+
+
+
+ax.set_xlim([1/120,0.5])
+ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+
+ax.set_ylabel("Power [$%s ^2 cycle \, per \, mon$]" % vunit)
+
+ax2 = ax.twiny()
+ax2.set_xscale('log')
+ax2.set_xticks(xper_ticks,labels=xper)
+ax2.set_xlim([1/120,0.5])
+
+ax.legend(fontsize=14)
+
+
+#%%
 
 
 
 
 #%%
 
-#%% Scrap below
-def detrend_by_regression(invar,in_ts,regress_monthly=False):
-    # Given an DataArray [invar] and Timeseries [in_ts]
-    # Detrend the timeseries by regression
-    
-    # Change to [lon x lat x time]
-    
-    reshape_flag = False
-    try:
-        invar       = invar.transpose('lon','lat','time')
-        invar_arr   = invar.data # [lon x lat x time]
-        
-    except:
-        print("Warning, input is not 3d or doesn't have ('lon','lat','time')")
-        reshape_output = make_2d_ds(invar,keepdim='time') #[1 x otherdims x time]
-        invar_arr      = reshape_output[0].data
-        reshape_flag = True
-    ints_arr         = in_ts.data # [time]
-    
-    if regress_monthly: # Do regression separately for each month
-        
-        nlon,nlat,ntime = invar_arr.shape
-        nyr             = int(ntime/12)
-        ints_monyr      = ints_arr.reshape(nyr,12)
-        invar_monyr     = invar_arr.reshape(nlon,nlat,nyr,12) # [lat x lon x yr x mon]
-        
-        betas      = []
-        intercepts = []
-        ymodels    = []
-        ydetrends  = []
-        sigmasks   = []
-        for im in range(12):
-            
-            outdict     = regress_ttest(invar_monyr[:,:,:,im],ints_monyr[:,im])
-            beta        = outdict['regression_coeff'] # Lon x Lat
-            intercept   = outdict['intercept'] 
-            
-            
-            # Remove the Trend
-            ymodel      = beta[:,:,None] * ints_monyr[None,None,:,im] + intercept[:,:,None]
-            ydetrend    = invar_monyr[:,:,:,im] - ymodel
-            
-            betas.append(beta)
-            intercepts.append(intercept)
-            ymodels.append(ymodel)
-            ydetrends.append(ydetrend)
-            sigmasks.append(outdict['sigmask'])
-        
-        beta        = np.array(betas)       # [Month x lon x lat]
-        intercept   = np.array(intercepts)  # [Month x lon x lat]
-        ymodel      = np.array(ymodels)     # [Month x lon x lat x yr]
-        ydetrend    = np.array(ydetrends)   # [Month x lon x lat x yr]
-        sigmasks    = np.array(sigmasks)
-        
-        ymodel      = ymodel.transpose(1,2,3,0).reshape(nlon,nlat,ntime)
-        ydetrend    = ydetrend.transpose(1,2,3,0).reshape(nlon,nlat,ntime)
-        
-        # Flip to [time x lat x lon]
-        sigmask_out     = sigmasks.transpose(0,2,1) 
-        beta            = beta.transpose(0,2,1)
-        intercept       = intercept.transpose(0,2,1)
-        
-    else:
-        
-        # Perform the regression
-        outdict     = regress_ttest(invar_arr,ints_arr)
-        beta        = outdict['regression_coeff'] # Lon x Lat
-        intercept   = outdict['intercept'] 
-        
-        # Remove the Trend
-        ymodel      = beta[:,:,None] * ints_arr[None,None,:] + intercept[:,:,None]
-        ydetrend    = invar_arr - ymodel
-        
-        # Prepare for input [lat x lon]
-        sigmask_out     = outdict['sigmask'].T
-        beta            = beta.T
-        intercept       = intercept.T
-        
-    # Prepare Output as DataArrays # [(time) x lat x lon]
-    
-    if reshape_flag is False: # Directly transpose and assign coords [time x lat x lon]
-        coords_full     = dict(time=invar.time,lat=invar.lat,lon=invar.lon)
-        if regress_monthly: # Add "mon" coordinate for monthly regression
-            coords          = dict(mon=np.arange(1,13,1),lat=invar.lat,lon=invar.lon)
-        else:
-            coords          = dict(lat=invar.lat,lon=invar.lon)
-        
-        da_detrend      = xr.DataArray(ydetrend.transpose(2,1,0),coords=coords_full,dims=coords_full,name=invar.name)
-        da_fit          = xr.DataArray(ymodel.transpose(2,1,0),coords=coords_full,dims=coords_full,name='fit')
-        
-        da_pattern      = xr.DataArray(beta,coords=coords,dims=coords,name='regression_pattern')
-        da_intercept    = xr.DataArray(intercept,coords=coords,dims=coords,name='intercept')
-        da_sig          = xr.DataArray(sigmask_out,coords=coords,dims=coords,name='sigmask')
-        
-    else: # Need to undo reshaping and reassign old coords...
-        
-        da_detrend      = reshape_2d_ds(ydetrend,invar,reshape_output[2],reshape_output[1])
-        da_fit          = reshape_2d_ds(ymodel,invar,reshape_output[2],reshape_output[1])
-        
-        if regress_monthly: # Add additional "Month" variable at the end
-        
-            ref_da        = invar.isel(time=0).squeeze().expand_dims(dim={'mon':np.arange(1,13,1)},axis=-1)
-            newshape      = list(reshape_output[2][:-1]) + [12,] # [Lon x Lat x Time]
-            newshape_dims = reshape_output[1][:-1] + ['mon',]
-        else:
-            ref_da        = invar.isel(time=0).squeeze() #
-            newshape      = reshape_output[2][:1] # Just Drop Time Dimension # [Lat x Lon]
-            newshape_dims = reshape_output[1][:-1]
-            
-        da_pattern      = reshape_2d_ds(beta, ref_da, reshape_output[2][:-1],reshape_output[1][:-1]) # Drop time dim
-        da_intercept    = reshape_2d_ds(intercept, ref_da, reshape_output[2][:-1],reshape_output[1][:-1]) # Drop time dim
-        da_sig          = reshape_2d_ds(sigmask_out, ref_da,reshape_output[2][:-1],reshape_output[1][:-1]) # Drop time dim
 
-    dsout = xr.merge([da_detrend,da_fit,da_pattern,da_intercept,da_sig],compat='override',join='override')
-    
-    return dsout
+
+#%%
+
+
 
 
 #%% 
