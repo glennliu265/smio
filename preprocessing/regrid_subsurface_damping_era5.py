@@ -134,7 +134,14 @@ plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=9)),plt.colorbar(),pl
 
 
 # Do some regridding for subsurface damping
-if dataset_name == "ORAS5":
+if "ORAS5" in dataset_name:
+    if "lon" in ds_in:
+        ds_in = ds_in.drop('nlon')
+        ds_in = ds_in.rename(dict(lon='nlon'))
+    if "lat" in ds_in:
+        ds_in = ds_in.drop('nlat')
+        ds_in = ds_in.rename(dict(lat='nlat'))
+        
     ds_in = ds_in.rename({"TLONG": "lon", "TLAT": "lat",})
     
 method         = 'bilinear' #'bilinear'
