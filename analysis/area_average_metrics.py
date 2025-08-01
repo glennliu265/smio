@@ -112,7 +112,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250711/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250730/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 proc.makedir(figpath)
 
@@ -208,11 +208,30 @@ expls           = ["dashed","dotted",'solid']
 
 # (6) Updated Versionw ith EN4 Damping and All-Feedback Forcing
 comparename     = "OutlineORAS5"
-expnames        = ["SST_Obs_Pilot_00_qnet_AConly_SPGNE_noREM","SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5","SST_ERA5_1979_2024"]
+expnames        = ["SST_Obs_Pilot_00_qnet_AConly_SPGNE_noREM","SST_ORAS5_avg","SST_ERA5_1979_2024"]
 expnames_long   = ["Stochastic Model","Stochastic Model (with re-emergence)","ERA5"]
 expnames_short  = ["SM","SM (+REM)","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
+
+# # (7) Compare different subsurface damping
+# comparename     = "CompareSubsurface"
+# expnames        = ["SST_Obs_Pilot_00_qnet_AConly_SPG_addlbdd","SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5","SST_ORAS5_avg","SST_ERA5_1979_2024"]
+# expnames_long   = ["EN4","ORAS5 (opa0)","ORAS5 (Ens. Avg.)","ERA5"]
+# expnames_short  = ["EN4","ORAS5_opa0","ORAS5_avg","ERA5"]
+# expcols         = ["red","cornflowerblue","navy","k"]
+# expls           = ["dashed","dotted","dotted",'solid']
+
+
+
+# # (8) ORAS5 MLD Comparison
+# comparename     = "MLDComparison"
+# expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_mld003","SST_ERA5_1979_2024"]
+# expnames_long   = ["MIMOC MLD","ORAS5 MLD","ERA5"]
+# expnames_short  = ["MIMOC","ORAS5","ERA5"]
+# expcols         = ["hotpink","navy","k"]
+# expls           = ["dotted","dashed",'solid']
+
 
 #%% Load information for each region
 
@@ -244,7 +263,7 @@ if (detrend_obs_regression):
     #sst_era['lat'] = 1
     
     # Load GMSST
-    ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
+    ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MaxIce.load()
     dsdtera5     = proc.detrend_by_regression(sst_era,ds_gmsst)
     
     sst_era_dt = dsdtera5.SST.squeeze()
@@ -252,16 +271,14 @@ if (detrend_obs_regression):
     ssts_ds[-1] = sst_era_dt
     ssts[-1] = sst_era_dt.data
     #print("\nSkipping ERA5, loading separately")
-
-
-
+    
 #%% Compute basic metrics
 
 ssts         = [ds.data for ds in ssts_ds]
 lags         = np.arange(61)
 nsmooths     = [250,] * (nexps-1) + [4,]
  #nsmooths     = [250,250,4]
-metrics_out  = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags)
+metrics_out  = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
 
 #%% Compute some additional metrics
 
@@ -497,18 +514,17 @@ if darkmode:
     figname = proc.addstrtoext(figname,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
-
 # ====================================================
 #%% Plot ACF for Winter and Summer (For Paper Outline)
 # ====================================================
 
 fsz_title = 26
 fsz_ticks = 14
-plotkmons = [1,6]
+plotkmons = [2,6]
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(8,6.5))
 
 for ii in range(2):
-    ax = axs[ii]
+    ax     = axs[ii]
     kmonth = plotkmons[ii]
     
     ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
@@ -562,8 +578,8 @@ plt.savefig(figname,dpi=150,transparent=transparent)
 # ---------------------------------
 
 
-fig       = plt.figure(figsize=(14,4))
-gs        = gridspec.GridSpec(4,12)
+fig             = plt.figure(figsize=(14,4))
+gs              = gridspec.GridSpec(4,12)
 
 # --------------------------------- # Barplot
 ax11            = fig.add_subplot(gs[:,:3],)
@@ -623,12 +639,14 @@ ax22       = fig.add_subplot(gs[:,4:])
 
 ax         = ax22
 
-decadal_focus = False
+decadal_focus = True
+obs_cutoff = 10 # in years
+obs_cutoff = 1/(obs_cutoff*12)
 
 dtmon_fix       = 60*60*24*30
 
 if decadal_focus:
-    xper            = np.array([10,5,1,0.5])
+    xper            = np.array([20,10,5,1,0.5])
 else:
     xper            = np.array([40,10,5,1,0.5])
 xper_ticks      = 1 / (xper*12)
@@ -638,11 +656,22 @@ for ii in range(nexps):
         col_in = dfcol
     else:
         col_in = expcols[ii]
+    
     plotspec        = metrics_out['specs'][ii] / dtmon_fix
     plotfreq        = metrics_out['freqs'][ii] * dtmon_fix
     CCs = metrics_out['CCs'][ii] / dtmon_fix
 
-    ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in)
+    
+    if ii == 2:
+        iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
+        ax.loglog(plotfreq,plotspec,label="",c=col_in,ls='dashed',lw=1.5)
+        plotfreq     = plotfreq[iplot_hifreq]
+        plotspec     = plotspec[iplot_hifreq]
+        
+        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in)
+        
+    else:
+        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in)
     
     #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
     #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
@@ -652,6 +681,7 @@ ax.axvline([1/(6)],label="",ls='dotted',c='gray')
 ax.axvline([1/(12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
 
 ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
@@ -665,7 +695,7 @@ ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
 
 # Plot Confidence Interval (ERA5)
 alpha           = 0.05
-cloc_era        = [6e-2,5e-2]
+cloc_era        = [2e-2,6]
 dof_era         = metrics_out['dofs'][-1]
 cbnds_era       = proc.calc_confspec(alpha,dof_era)
 proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
