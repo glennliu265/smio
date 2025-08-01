@@ -182,7 +182,7 @@ dsa_era       = proc.xrdeseason(ds_era)
 flxa_era      = proc.xrdeseason(ds_era_flx)
 
 # Detrend by Regression to the global Mean
-ds_gmsst      = xr.open_dataset(dpath_era + nc_gmsst).GMSST_MeanIce.load()
+ds_gmsst      = xr.open_dataset(dpath_era + nc_gmsst).GMSST_MaxIce.load()
 dtout         = proc.detrend_by_regression(dsa_era,ds_gmsst)
 sst_era       = dtout.sst
 dtout_flx     = proc.detrend_by_regression(flxa_era,ds_gmsst)
@@ -199,7 +199,7 @@ bbox_nnat   = [-80,0,20,60]
 bboxes      = [bbox_spgne,bbox_nnat]
 
 bbnames           = ["SPGNE","NNAT"]
-bbnames_long     = ["Northeastern Subpolar Gyre",
+bbnames_long      = ["Northeastern Subpolar Gyre",
                     "Extratropical North Atlantic"]
 
 
@@ -242,7 +242,7 @@ for rr in range(nregs):
     aavgs_byreg.append(aavgs)
     
     ssts    = [aa.data for aa in aavgs]
-    tsms = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags)
+    tsms    = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
     metrics_byreg.append(tsms)
     
     smms = calc_stds_sample(aavgs)
@@ -367,7 +367,7 @@ for rr in range(2):
 # ======================
 
 
-remove_topright=True
+remove_topright = True
 
 
 
