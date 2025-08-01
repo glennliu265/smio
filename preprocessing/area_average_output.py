@@ -7,7 +7,6 @@ Concatenate ensemble x time into a continuous timeseries...
 
 Supports output from [run_SSS_basinwide], set smoutput=True
 
-
 Created on Tue May  6 15:08:16 2025
 
 @author: gliu
@@ -59,7 +58,7 @@ proc.makedir(outpath)
 #%% User Edits
 
 
-smoutput = False # Set to True for stochastic model output
+smoutput = True # Set to True for stochastic model output
 
 # outformat = "{outpath}{expname}_{vname}_{ystart:04d}_{yend:04d}_{procstring}.nc"
 # outname    = outformat.format(outpath=outpath,
@@ -73,61 +72,60 @@ outformat = "%s%s_%s_%04d_%04d_%s.nc"
 
 # If smoutput is <True>... ----------------------------------------------------
 # Use sm loader and output path to metrics folder
-expname  = "SST_ERA5_1979_2024"
-vname    = "SST"
-
-concat_dim = "ens"
+expname     = "SST_ORAS5_avg_mld003"#"SST_ORAS5_avg"#"SST_ERA5_1979_2024"
+vname       = "SST"
+concat_dim  = "time"
 
 if smoutput:
     sm_output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
     outpath        = "%s%s/Metrics/" % (sm_output_path,expname) # Save into experiment directory
     # Output path to "Metrics" Folder of stochastic model output...
     outname = "%sArea_Avg_%s.nc" % (outpath,bbfn)
-
-
-# Otherwise specify an ncsearch
-
-# CESM2_POM3_PiControl_SHF_0100_0500_raw.nc ~~~~~~~~~~~~~~~~
-concat_dim = "time"
-vname      = "TS"
-expname    = "CESM2_POM3_PiControl"
-ystart     = 000
-yend       = 500
-procstring = "raw"
-searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/POM/"
-ncsearch   = searchpath + "*TS.nc"
-
-# CESM2_FCM_PiControl_SHF_ ~~~~~~~~~~~~~~~~
-# concat_dim = "time"
-# vname      = "SHF"
-# expname    = "CESM2_FCM_PiControl"
-# ystart     = 0000
-# yend       = 2000
-# procstring = "raw"
-# searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/ocn/SHF/"
-# ncsearch   = searchpath + "*SHF*.nc"
-
-# # CESM2_FCM_PiControl_SST_ ~~~~~~~~~~~~~~~~
-# concat_dim = "time"
-# vname      = "SST"
-# expname    = "CESM2_FCM_PiControl"
-# ystart     = 0000
-# yend       = 2000
-# procstring = "raw"
-# searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/ocn/SST/"
-# ncsearch   = searchpath + "*SST*.nc"
-
-# SOM TS
-concat_dim = "time"
-vname      = "LHFLX"#"FLNS"#"TS"
-expname    = "CESM2_SOM_PiControl"
-ystart     = 0
-yend       = 360
-procstring = "raw"
-searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/SOM/"
-ncsearch   = searchpath + "*%s*.nc" % vname
-
-outname    = outformat % (outpath,expname,vname,ystart,yend,procstring)
+    
+else:
+    # Otherwise specify an ncsearch
+    
+    # CESM2_POM3_PiControl_SHF_0100_0500_raw.nc ~~~~~~~~~~~~~~~~
+    concat_dim = "time"
+    vname      = "TS"
+    expname    = "CESM2_POM3_PiControl"
+    ystart     = 000
+    yend       = 500
+    procstring = "raw"
+    searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/POM/"
+    ncsearch   = searchpath + "*TS.nc"
+    
+    #CESM2_FCM_PiControl_SHF_ ~~~~~~~~~~~~~~~~
+    concat_dim = "time"
+    vname      = "SHF"
+    expname    = "CESM2_FCM_PiControl"
+    ystart     = 0000
+    yend       = 2000
+    procstring = "raw"
+    searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/ocn/SHF/"
+    ncsearch   = searchpath + "*SHF*.nc"
+    
+    # CESM2_FCM_PiControl_SST_ ~~~~~~~~~~~~~~~~
+    concat_dim = "time"
+    vname      = "SST"
+    expname    = "CESM2_FCM_PiControl"
+    ystart     = 0000
+    yend       = 2000
+    procstring = "raw"
+    searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/ocn/SST/"
+    ncsearch   = searchpath + "*SST*.nc"
+    
+    # SOM TS
+    concat_dim = "time"
+    vname      = "LHFLX"#"FLNS"#"TS"
+    expname    = "CESM2_SOM_PiControl"
+    ystart     = 0
+    yend       = 360
+    procstring = "raw"
+    searchpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/SOM/"
+    ncsearch   = searchpath + "*%s*.nc" % vname
+    
+    outname    = outformat % (outpath,expname,vname,ystart,yend,procstring)
 
 print("Region is        : %s" % bbfn)
 print("Output Path is   : %s" % outpath)

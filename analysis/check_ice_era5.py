@@ -104,10 +104,10 @@ icemax  = dsice.max('time')
 
 #%%
 
+fsz_ticks = 24
 cints_max = np.arange(0,0.06,0.01)
-fig,ax,_  = viz.init_regplot(regname="SPGE")
+fig,ax,_  = viz.init_regplot(regname="SPG",fontsize=28)
 #fig,ax,_  = viz.init_regplot()
-
 
 invar     = icemax
 iceplot   = xr.where(invar <= 0.05,np.nan,invar)
@@ -119,15 +119,16 @@ pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                         transform=proj)
 cl     = ax.contour(plotvar.lon,plotvar.lat,invar,
                         colors="red",levels=[0.05,],
-                        transform=proj,linewidths=2)
+                        transform=proj,linewidths=4)
 ax.clabel(cl)
 
 plotvar = icemean
 cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                         colors="yellow",levels=[0.05,],
-                        transform=proj,linewidths=2,linestyles='dotted')
+                        transform=proj,linewidths=4,linestyles='dotted')
 ax.clabel(cl)
 
+#ax.legend()
 
 # pcm     = ax.contour(plotvar.lon,plotvar.lat,plotvar,
 #                         colors="k",levels=cints_max,
@@ -135,6 +136,8 @@ ax.clabel(cl)
 #ax.clabel(pcm)
 
 cb = viz.hcbar(pcm)
+cb.ax.tick_params(labelsize=fsz_ticks)
+cb.set_label("Sea Ice Concentration",fontsize=38)
 viz.plot_box(bbox_spgne,ax=ax,color='limegreen',proj=proj,linewidth=2.5)
 
 

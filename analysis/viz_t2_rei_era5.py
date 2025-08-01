@@ -46,7 +46,7 @@ import cvd_utils as cvd
 #%% Plotting Inputs
 
 # Set Plotting Options
-darkmode = False
+darkmode = True
 if darkmode:
     dfcol = "w"
     bgcol = np.array([15,15,15])/256
@@ -93,7 +93,7 @@ cints_adt       = np.arange(-100, 110, 10)
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250521/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250606/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 procpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 
@@ -381,16 +381,16 @@ ax.set_title(loctitle,fontsize=42)
 #%% Inset Map with ERA5 Only (Paper Outline)
 # <-> <0> <-> <-> <0> <-> <-> <0> <-> <-> <0> <->
 
-bbsel = [-40, -15, 52, 62] # [-40, -12, 50, 62]
-
+bbsel           = [-40, -15, 52, 62] # [-40, -12, 50, 62]
 centlat         = 45
 #bboxplot_new    = [-80,0,] 
 #apply_mask      =  ds_masks.mask_mon
+
 # Plot Setting
-cints           = np.arange(0,29,1) #np.arange(0,30,2)
+cints           = np.arange(0,30,2) #np.arange(0,30,2)
 cmap            = 'cmo.tempo_r'
 ii              = 1
-pmesh           = True
+pmesh           = False
 kmonths         = [1,2]# np.arange(12)
 
 fig,ax,_       = viz.init_orthomap(1,1,bboxplot,figsize=(20,10),centlat=centlat)
@@ -408,7 +408,7 @@ if pmesh:
 else:
     cf      = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
                           levels=cints,
-                          transform=proj,cmap=cmap,zorder=-1)
+                          transform=proj,cmap=cmap,zorder=-1,extend='both')
 
 # Plot the SSH (Time Mean) --------------
 #if ii == 1:
@@ -417,19 +417,16 @@ cl = ax.contour(plotvar.lon, plotvar.lat, plotvar.adt*100, colors="k",alpha=1,
                 linewidths=.75, transform=proj, levels=cints_adt) 
     
 cb = viz.hcbar(cf,ax=ax,fontsize=22)
-cb.set_label("Wintertime Decorrelation Timescale $T_2$ [Months]",fontsize=fsz_axis)  
+cb.set_label("SST Wintertime Decorrelation Timescale $T_2$ [Months]",fontsize=fsz_axis)  
 
 # Plot the Box
 viz.plot_box(bbsel,ax=ax,proj=proj,color='indigo',linewidth=4,linestyle='dashed')
-
-
 
 # Plot the sea ice edge
 plotvar = dsmaskplot#ds_masks.mask_mon
 cl = ax.contour(plotvar.lon, plotvar.lat,
                 plotvar, colors="cyan",
                 linewidths=2, transform=proj, levels=[0, 1], zorder=-1)
-
 
 # # Add an Inset! -----------
 # centlon = -40
@@ -461,7 +458,9 @@ cl = ax.contour(plotvar.lon, plotvar.lat,
 #ax.set_title(loctitle,fontsize=42)
 
 figname = "%sWinterimte_T2_Locator.png" % (figpath)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+if darkmode:
+    figname = proc.addstrtoext(figname,"_dark")
+plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 
 

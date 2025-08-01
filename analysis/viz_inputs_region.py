@@ -13,8 +13,6 @@ Created on Fri Apr 18 10:41:13 2025
 
 """
 
-
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -93,14 +91,13 @@ cints_adt       = np.arange(-100, 110, 10)
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20250318/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250523/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 procpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 input_path      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/"
 
-expname         = "SST_Obs_Pilot_00_Tdcorr0_qnet"
-expname_long    = "Stochastic Model (with Re-emergence)"
-
+expname         = "SST_ORAS5_avg_mld003"#"SST_Obs_Pilot_00_Tdcorr0_qnet_noPositive"
+expname_long    = "ORAS5_MLD"#"Stochastic Model (with Re-emergence)"
 
 # Indicate the Region
 bbsel  = [-40,-15,52,62]
@@ -185,16 +182,22 @@ ds_inputs_reg = proc.sel_region_xr(ds_inputs,bbsel)
 
 #%% Plot forcing, damping, mld
 
-fig,axs = viz.init_monplot(3,1,figsize=(8,14))
+fsz_axis   = 28
+fsz_ticks  = 18
+fsz_legend = 24
 
-vnames      = ['lbd_a','Fprime','h']
-vnames_long = ['Damping ($\lambda^a$)',"Stochastic Forcing ($F'$)","Mixed-Layer Depth ($h$)"]
-vunits      = [r"$\frac{W}{m^2 \, \degree C}$",r"$\frac{W}{m^2}$",r"$m$"]
+fig,axs = viz.init_monplot(4,1,figsize=(8,18))
+
+vnames      = ['lbd_a','Fprime','h','lbd_d']
+vnames_long = ['Damping ($\lambda^a$)',"Stochastic Forcing ($F'$)","Mixed-Layer Depth ($h$)","Subsurface Damping ($\lambda^d$)"]
+vunits      = [r"$\frac{W}{m^2 \, \degree C}$",r"$\frac{W}{m^2}$",r"$m$","$Correlation$"]
 avg_later_byvar = []
 
 
+vvcol = ["darkred","yellow","navy",'green']
 
-for vv in range(3):
+
+for vv in range(4):
     ax = axs[vv]
     
     vname   = vnames[vv]
@@ -206,27 +209,39 @@ for vv in range(3):
     if vv == 0: # For Hflx
         problem_pt  = np.zeros((nlat*nlon))
     
+    lbl = 0
     avg_later = []
     for nn in tqdm.tqdm(range(nlat*nlon)):
         
+        if lbl == 1:
+            label_in = ""
+        else:
+            label_in = "Individual Point"
         
         if np.any(plotvar[:,nn] == 0):
             if vv == 0:
                 problem_pt[nn] = 1
             continue
         else:
-            ax.plot(mons3,plotvar[:,nn],alpha=0.2,label="")
+            ax.plot(mons3,plotvar[:,nn],alpha=0.2,label=label_in)
             avg_later.append(plotvar[:,nn])
-    
+        
+        if label_in == "Individual Point":
+            lbl = 1
     
     avg_later = np.array(avg_later)
     avg_later_byvar.append(avg_later)
-    #ax.plot(mons3,plotvar.mean(1),alpha=1,c='k',label=vnames_long[vv])
-    ax.plot(mons3,avg_later.mean(0),alpha=1,c='k',label=vnames_long[vv])
+    ax.plot(mons3,avg_later.mean(0),alpha=1,c=vvcol[vv],label="Region Average")
     
-    ax.legend()
+    if vv == 0: 
+        ax.legend(fontsize=fsz_legend)
+    ax.tick_params(labelsize=fsz_ticks)
+    ax.set_ylabel("%s \n [%s]" % (vnames_long[vv],vunits[vv]),fontsize=fsz_axis)
     
 problem_pt=problem_pt.reshape(nlat,nlon)
+
+figname = "%sSM_Inputs_Scycle_%s.png" % (figpath,expname)
+plt.savefig(figname,bbox_inches='tight',dpi=150)
 
 #%% 
 
@@ -300,3 +315,7 @@ for imon in range(12):
     
     figname = "%sSPG_Box_Inputs_%s_%s_mon%02i.png" % (figpath,expname,vnames[vv],imon+1)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+#%% Plot Subsurface damping
+
+

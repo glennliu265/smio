@@ -58,11 +58,9 @@ outname_ice = "%sERA5_IceMask_Global_1940_1978.nc" % (dpath)
 # Load SST
 ds_sst = xr.open_dataset(ncsst).sst.load()#.sst
 
-
 # Load Sea Ice and Crop
 ds_ice = xr.open_dataset(ncice).siconc.load()
 #ds_ice = ds_ice.sel(time=slice('1979-01-01',None))
-
 
 #ds_sst = 
 ds_in = [ds_sst,ds_ice]

@@ -74,10 +74,16 @@ dsall = xr.open_mfdataset(ncs, combine='nested', concat_dim='time').load()
 
 # %% Restrict to Region/Time
 
-ystart = '1940'
+ystart = '1979'
 yend = '2024'
-bbox = [-40, -15, 52, 62]  # [-80,0,0,65]#
-regname = "SPGNE"  # NATL
+
+
+#bbox = [-40, -15, 52, 62]  # [-80,0,0,65]#
+#regname = "SPGNE"  # NATL
+
+bbox = [-75,-40,37,45]
+regname = "GS"
+
 dsreg = proc.sel_region_xr(dsall, bbox)
 dsreg = dsreg.sel(time=slice("%s-01-01" % ystart, "%s-12-31" % yend))
 
@@ -114,7 +120,7 @@ tsm2   = scm.compute_sm_metrics(aavgs, lags=lags, nsmooth=2 ,detrend_acf=True)
 
 # %% Check Impacts on ACF
 
-kmonth  = 1
+kmonth  = 2
 xtks    = lags[::3]
 
 fig, ax = plt.subplots(1, 1, constrained_layout=True, figsize=(8, 4.5))
@@ -135,6 +141,7 @@ for ii in range(3):
 ax.legend()
 
 #%% Check Impacts On Monthly Variance
+mons3 = proc.get_monstr()
 
 fig,ax = viz.init_monplot(1,1)
 

@@ -261,11 +261,6 @@ for a,ax in enumerate([ax1,ax2]):
     
     
     
-    
-
-
-
-
 
 #sstin = [flxarr[:,0,klat,klon],Fprime[:,0,klat,klon]]
 
