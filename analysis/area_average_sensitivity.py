@@ -54,7 +54,7 @@ import cvd_utils as cvd
 #%% Plotting Inputs
 
 # Set Plotting Options
-darkmode = False
+darkmode = True
 if darkmode:
     dfcol = "w"
     bgcol = np.array([15,15,15])/256
@@ -296,9 +296,35 @@ ax = axs[1]
 ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
 
 
-figname = "%sSST_SM_ERA5_Timeseries_Comparison_istart%05i.png" % (figpath,comparename,istart,)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+figname = "%s%sSST_SM_ERA5_Timeseries_Comparison_istart%05i.png" % (figpath,comparename,istart,)
+if darkmode:
+    figname = proc.addstrtoext(figname,"_darkmode")
+plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
+
+#%% Plot just the ERA5 Timeseries
+
+# Initialize Fig
+fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+
+# Plot Era
+ax.plot(era_sst,label=expnames[-1],c=dfcol)
+
+#ax.legend(fontsize=fsz_legend)
+ax.set_xlim(xlims)
+ax.set_ylim(ylims)
+ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
+ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
+ax.tick_params(labelsize=fsz_ticks,)
+ax.set_xticks(xplot[::plotint],labels=years[::plotint])
+
+# Hide the right and top spines
+ax.spines[['right', 'top']].set_visible(False)
+
+figname = "%s%sERA5_Timeseries_Comparison_istart%05i.png" % (figpath,comparename,istart,)
+if darkmode:
+    figname = proc.addstrtoext(figname,"_darkmode")
+plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Find time with the best fit
 
@@ -340,6 +366,7 @@ ax.legend()
 
 #%% Plot resulting timeseries
 
+remove_topright   = True
 label_actual_year = True
 ylims             = [-2,2]
 
@@ -348,7 +375,7 @@ fig,axs           = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
 
 # Plot Era
 ax         = axs[0]
-ax.plot(era_sst,label=expnames_long[-1],c=expcols[-1])
+ax.plot(era_sst,label=expnames_long[-1],c=dfcol)
 
 era_lp  = proc.lp_butter(era_sst,120,6)
 
@@ -377,8 +404,11 @@ for ax in axs:
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
     ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
-    ax.axhline([0],ls='dotted',c='k',lw=0.75)
+    ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
     ax.tick_params(labelsize=fsz_ticks)
+    if remove_topright:
+        ax.spines[['right', 'top']].set_visible(False)
+        
 ax = axs[0]
 ax.set_xticks(xplot[::plotint],labels=years[::plotint])
 
@@ -387,7 +417,10 @@ ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
 
 
 figname = "%sSST_SM_ERA5_Timeseries_Comparison_%s_istart%05i_lpf%02i.png" % (figpath,comparename,imins[1],lpcutoff)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+if darkmode:
+    figname = proc.addstrtoext(figname,"_darkmode")
+    
+plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 
 #%% Compute Metrics for each case
