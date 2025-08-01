@@ -85,6 +85,7 @@ dsmask180 = proc.lon360to180_xr(dsmask)
 
 
 #%% Compare Damping Estimates over the northeastern SPG
+
 bboxSPGNE   = [-40,-15,52,62]
 bbsel       = [-50,-10,45,65]
 fsz_tick    = 24
@@ -144,7 +145,14 @@ for imon in range(12):
 
 ilag        = 0
 imon        = 1
-vname_plot  = "sst_flx_crosscorr" # "sst_autocorr"#
+vname_plot  = "cov"#"sst_flx_crosscorr" # "sst_autocorr"#
+
+
+if vname_plot == "SHF_damping":
+    cints       = np.arange(-39,42,3)
+elif vname_plot == "cov":
+    cints       = np.arange(-5,5.5,0.5)
+    
 
 
 for imon in range(12):
