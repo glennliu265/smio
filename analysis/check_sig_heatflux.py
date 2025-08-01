@@ -149,7 +149,7 @@ p20        : Use p = 0.20
 AConly     : Test Autocorrelation Only
 
 """
-signame ="p20"# "noPositive"#"noPositive"#"pilot" #"noPositive" # 
+signame ="noPositive" #"p20"# "noPositive"#"noPositive"#"pilot" #"noPositive" # 
 print("Significance Testing Option is: %s" % (signame))
 
 hff   = damping_era5.copy()
@@ -927,8 +927,7 @@ for im in range(12):
 
 #%% Plot Estimates for a Given Month
 
-im = 6
-
+im = 1
 fig,axs,_  = viz.init_orthomap(1,3,bboxplot=bbplot2,figsize=(18,8),centlon=-25)
 
 for a,ax in enumerate(axs):

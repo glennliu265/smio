@@ -65,20 +65,34 @@ print("Output Path is   : %s" % outpath)
 # Need to find source and include newer years.
 
 expname     = "HadISST"
-vname       = "SST"
-ystart      = 1920
-yend        = 2017
-procstring  = "detrend_deseason"
-vname_out       = 'sst'
+vname       = "sst" #"SST"
+ystart      = 1870#1920
+yend        = 2024#2017
+procstring  = "raw"#"detrend_deseason"
+vname_out   = 'sst'
 outname     = "%s%s_%s_%s_%s_%s.nc" % (outpath,expname,vname_out,ystart,yend,procstring)
 print(outname)
 
+latname = "latitude"
+lonname = "longitude"
 
-dpathraw    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
-rawnc       = "HadISST_Detrended_Deanomalized_1920_2018.nc"
+# Indcdate Dataset
+#dpathraw    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
+#rawnc       = "HadISST_Detrended_Deanomalized_1920_2018.nc"
+dpathraw = "/Users/gliu/Globus_File_Transfer/Reanalysis/HadISST/"
+rawnc    = "HadISST_sst_18700101_20250501.nc"
 
 st          = time.time()
-dsfull      = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
+dsfull      = xr.open_dataset(dpathraw + rawnc) ## Lon180 x Lat x Time
+
+# Slice to Time, Flip Longitude to 180
+dsfull          = dsfull[vname]
+dsfull          = proc.format_ds(dsfull,latname=latname,lonname=lonname)
+tstart          = '%04i-01-01' % ystart
+tend            = "%04i-12-31" % yend
+dsfull          = dsfull.sel(time=slice(tstart,tend))
+
+# Crop
 dsreg       = proc.sel_region_xr(dsfull,bbsel).load()
 proc.printtime(st,print_str='Loaded')
 aavg        = proc.area_avg_cosweight(dsreg)
@@ -194,27 +208,35 @@ edict           = proc.make_encoding_dict(aavg)
 aavg.to_netcdf(outname,encoding=edict)
 print("Loaded in %.2fs" % (time.time()-st))
 
+# ===============
 # %% ERSST 5
-#
+# ===============
 
 expname         = "ERSST5"
 vname           = "sst"
 ystart          = 1854
-yend            = 2017
+yend            = 2024
 procstring      = "raw"
 outname         = "%s%s_%s_%s_%s_%s.nc" % (outpath,expname,vname,ystart,yend,procstring)
 print(outname)
 vname_out       = 'sst'
 
-rawnc           = "ERSST5.nc"
-dpathraw        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
+rawnc           = "ERSST_sst_1854_2024.nc"
+dpathraw        = "/Users/gliu/Globus_File_Transfer/Reanalysis/ERSST/"
+
+# Open Dataset
 st              = time.time()
 dsfull          = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
-dsreg           = proc.sel_region_xr(dsfull,bbsel).load()[vname]
+
+
+# Do some preprocessing (Flip Longitude)
+dsfull          = proc.format_ds(dsfull[vname].squeeze())
+dsreg           = proc.sel_region_xr(dsfull,bbsel).load()#[vname]
 proc.printtime(st,print_str='Loaded')
 
 # Select time
-dsreg = dsreg.sel(time=slice(None,'2017-12-31'))
+
+#dsreg = dsreg.sel(time=slice(None,'2017-12-31'))
 
 # Take Area Average and Save
 aavg            = proc.area_avg_cosweight(dsreg)
@@ -246,9 +268,14 @@ dpathraw        = "/Users/gliu/Globus_File_Transfer/Reanalysis/DCENT/"
 st              = time.time()
 dsfull          = xr.open_dataset(dpathraw + rawnc) # Lon180 x Lat x Time
 
+# Slice to Time
+tstart          = '%04i-01-01' % ystart
+tend            = "%04i-12-31" % yend
+dsfull          = dsfull.sel(time=slice(tstart,tend))
+dsfull          = dsfull[vname]
+
 # Do some preprocessing (Flip Longitude)
 dsfull          = proc.format_ds(dsfull[vname])
-
 dsreg           = proc.sel_region_xr(dsfull,bbsel).load()#[vname]
 proc.printtime(st,print_str='Loaded')
 
