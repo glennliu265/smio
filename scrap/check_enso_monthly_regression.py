@@ -54,164 +54,374 @@ import amv.proc as hf # Update hf with actual hfutils script, most relevant func
 # timestr           = "%sto%s" % (tstart[:4],tend[:4])
 
 # ENSO Parameters
-pcrem             = 3                   # PCs to calculate
-bbox              = [120, 290, -20, 20] # ENSO Bounding Box
+pcrem               = 3                   # PCs to calculate
+bbox                = [120, 290, -20, 20] # ENSO Bounding Box
+#bbox               =  [-40,-15,52,62]
 
 # Toggles and Options
-overwrite        = True # Set to True to overwrite existing output...
-save_netcdf      = True # Set true to save netcdf version, false to save npz
-debug            = True # Debug toggle
+overwrite           = True # Set to True to overwrite existing output...
+save_netcdf         = True # Set true to save netcdf version, false to save npz
+debug               = True # Debug toggle
 
 #%% Dataset option (load full TS variable in [time x lat x lon360])
 # Example provided below here is for CESM1
 
 
 # Output Path (Checks for an "enso" folder)
-outpath             = ""#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/"
-
-# Data Information
-# dataset_name        = 'cesm1_htr_5degbilinear'#"cesm2_pic"
-# datpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"#"/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/atm/"
-# vname               = "TS"
-# lonname             = "lon"
-# latname             = "lat"
-# timename            = "time"
-# concat_dim          = "ens" #"time"
-# keepvars            = [timename,latname,lonname,vname]
-# ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-# detrend             = 1 # 1 to remove linear trend 
-maskpath            = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/masks/"
-maskname            = 'cesm1_htr_5degbilinear_limask_0.3p_0.05p_year1920to2005_enssum.nc'#"cesm2_pic_limask_0.3p_0.05p.nc"
-
-# NOAA OISST
-dataset_name        = 'OISST'#"cesm2_pic"
-datpath             = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-vname               = "sst"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
-concat_dim          = None#"time"
-keepvars            = [timename,latname,lonname,vname]
-ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-detrend             = 1 # 1 to remove linear trend 
-outpath             = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/"
-
-
-# ERA5 SST
-dataset_name        = 'ERA5'#"cesm2_pic"
-datpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/data/NATL_proc_obs/"
-vname               = "sst"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
-concat_dim          = None#"time"
-keepvars            = [timename,latname,lonname,vname]
-ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-detrend             = 1 # 1 to remove linear trend 
-outpath             = ""
-yr_range            = "1979to2024" # Other topin is 1979to2021
-
-# OAFLUX (1deg, jetstream rip)
-dataset_name        = "OAFLUX"
-datpath             = "/Users/gliu/Globus_File_Transfer/Reanalysis/OAFLUX/"
-vname               = "sst"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
-concat_dim          = None#"time"
-keepvars            = [timename,latname,lonname,vname]
-ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-detrend             = 1 # 1 to remove linear trend 
-outpath             = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/enso/"
-#yr_range            = "1984to2007" # Other topin is 1979to2021
-croptime            = True # Cut the time prior to detrending, EOF, etc
-tstart              = '1984-01-01' #'1920-01-01'#'0001-01-01' # "2006-01-01" # 
-tend                = '2007-12-31'#'2021-12-31' #'2005-12-31'#'2000-02-01' # "2101-01-01" # 
-timestr             = "%sto%s" % (tstart[:4],tend[:4])
-yr_range            = timestr
-
-# CESM2 PiControl FOM
-dataset_name        = "CESM2_FOM"
-datpath             = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/atm/TS/"
-vname               = "TS"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
-concat_dim          = "time"
-keepvars            = [timename,latname,lonname,vname]
-ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-detrend             = 1 # 1 to remove linear trend 
-outpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/enso/"
-#yr_range            = "1984to2007" # Other topin is 1979to2021
-croptime            = True # Cut the time prior to detrending, EOF, etc
-tstart              = '0200-01-01' #'1920-01-01'#'0001-01-01' # "2006-01-01" # 
-tend                = '2000-12-31'#'2021-12-31' #'2005-12-31'#'2000-02-01' # "2101-01-01" # 
-timestr             = "%sto%s" % (tstart[:4],tend[:4])
-yr_range            = timestr
-
-# # CESM2 PiControl FOM
-# dataset_name        = "CESM2_SOM"
-# datpath             = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/SOM/"
-# vname               = "TS"
-# lonname             = "lon"
-# latname             = "lat"
-# timename            = "time"
-# concat_dim          = "time"
-# keepvars            = [timename,latname,lonname,vname]
-# ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-# detrend             = 1 # 1 to remove linear trend 
-# outpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/enso/"
-# #yr_range            = "1984to2007" # Other topin is 1979to2021
-# croptime            = True # Cut the time prior to detrending, EOF, etc
-# tstart              = '0060-01-01' #'1920-01-01'#'0001-01-01' # "2006-01-01" # 
-# tend                = '0360-12-31'#'2021-12-31' #'2005-12-31'#'2000-02-01' # "2101-01-01" # 
-# timestr             = "%sto%s" % (tstart[:4],tend[:4])
-# yr_range            = timestr
-
-# CESM2 PiControl MCOM
-dataset_name        = "CESM2_MCOM"
-datpath             = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/POM/"
-vname               = "TS"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
-concat_dim          = "time"
-keepvars            = [timename,latname,lonname,vname]
-ensnum              = 1 # Irrelevant for now, need to add ensemble support...
-detrend             = 1 # 1 to remove linear trend 
-outpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/enso/"
-#yr_range            = "1984to2007" # Other topin is 1979to2021
-croptime            = True # Cut the time prior to detrending, EOF, etc
-tstart              = '0100-01-01' 
-tend                = '0500-12-31'
-timestr             = "%sto%s" % (tstart[:4],tend[:4])
-yr_range            = timestr
+outpath             = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/enso/ensotest/"#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/"
 
 # ERA5 with Monthly GMSST Removal
-dataset_name        = "ERA5_MonGREM"
-datpath             = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/POM/"
-vname               = "TS"
-lonname             = "lon"
-latname             = "lat"
-timename            = "time"
+dataset_name        = "ERA5_ensotest"
+datpath             = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+ncname              = "sst_1979_2024.nc"
+
+# NetCDF Information
+vname               = "sst"
+lonname             = "longitude"
+latname             = "latitude"
+timename            = "valid_time"
 concat_dim          = "time"
 keepvars            = [timename,latname,lonname,vname]
 ensnum              = 1 # Irrelevant for now, need to add ensemble support...
 detrend             = 1 # 1 to remove linear trend 
-outpath             = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/enso/"
-#yr_range            = "1984to2007" # Other topin is 1979to2021
-croptime            = True # Cut the time prior to detrending, EOF, etc
-tstart              = '0100-01-01' 
-tend                = '0500-12-31'
+
+croptime            = False # Cut the time prior to detrending, EOF, etc
+tstart              = '1979-01-01' 
+tend                = '2024-12-31'
 timestr             = "%sto%s" % (tstart[:4],tend[:4])
 yr_range            = timestr
-
 
 # Mask Information (first run a maskmaker script/section such as that in preproc_CESM2_PiControl.py)
 maskpath            = None
 maskname            = None
 
+#%% Load GMSST Information (for detrending)
 
+
+# Load GMSST
+dpath_gmsst = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst    = "ERA5_GMSST_1979_2024.nc"
+ds_gmsst    = xr.open_dataset(
+    dpath_gmsst + nc_gmsst).load()  # .GMSST_MeanIce.load()
+
+
+
+#%% Load Variable
+
+# Load Variable (7.09sec)
+st=time.time()
+ds_all = xr.open_dataset(datpath+ncname).load()
+proc.printtime(st)
+
+#%% Preprocess
+
+# Rename Dimensions
+if np.any(np.array(bbox[:2]) < 0):
+    lon180=True
+else:
+    lon180=False
+ds_all = proc.format_ds(ds_all,latname=latname,lonname=lonname,timename=timename,lon180=lon180,verbose=True)#ds_all.rename(dict(valid_time='time'))
+
+
+ds_reg = proc.sel_region_xr(ds_all,bbox)
+
+# Deseason
+dsa = proc.xrdeseason(ds_reg.sst)
+
+#%% Now Try Different Detrending Approaches
+
+
+# (1): Simple Linear Detrend (9.68s)
+dt1     = proc.xrdetrend(dsa)
+dt1mon  = proc.xrdetrend_nd(dsa,1,return_fit=False,regress_monthly=True)
+
+# (2): Quadratic Detrend (separately and separately by month)
+dt2     = proc.xrdetrend_nd(dsa,2,return_fit=False)
+dt2mon  = proc.xrdetrend_nd(dsa,2,return_fit=False,regress_monthly=True)
+
+# (3): Removing GMSST
+gmout       = proc.detrend_by_regression(dsa,ds_gmsst.GMSST_MeanIce)
+gmoutmon    = proc.detrend_by_regression(dsa,ds_gmsst.GMSST_MeanIce,regress_monthly=True)
+
+dt3         = gmout.sst
+dt3mon      = gmoutmon.sst
+
+
+#%% Visualize timeseries over Nino3.4 box
+
+bboxnino34 = [360-170,360-120,-5,5,]
+#bboxnino34 = bbox# For SPGNE Region
+dtall      = [dsa,dt1,dt1mon,dt2,dt2mon,dt3,dt3mon]
+expnames   = ["Raw","Linear","Linear (Monthly)","Quadratic","Quadratic (Monthly)","GMSST Removal","GMSST Removal (Monthly)"]
+
+
+expcols    = ['gray',"hotpink","red","cornflowerblue","midnightblue","goldenrod","brown"]
+els        = ["solid","solid","dashed","solid",'dashed',"solid",'dashed']
+
+ndt = len(dtall)
+dtall34 = [proc.sel_region_xr(ds,bboxnino34) for ds in dtall]
+aavgs   = [proc.area_avg_cosweight(ds) for ds in dtall34]
+
+
+#%% Plot the timeseries
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,3.5))
+
+for n in range(ndt):
+    plotvar = aavgs[n]
+    ax.plot(plotvar.time,plotvar,label=expnames[n],c=expcols[n],ls=els[n],lw=2)
+    
+    
+ax.legend(ncol=3,fontsize=8)
+ax.set_xlabel("Year")
+ax.set_ylabel("SST Anomaly (degC)")
+
+ax.set_title("Nino3.4 Index (ERA5, 1979-2024)")
+#ax.set_title("SPGNE (ERA5, 1979-2024)")
+#
+ax.set_ylim([-2,2])
+ax.set_ylim([-3.5,3.5])
+ax.set_xlim([plotvar.time[-60],plotvar.time[-1]])
+
+
+#%% Plot what happens to monthly variance
+
+monvar = [ds.groupby('time.month').std('time') for ds in aavgs]
+mons3 = proc.get_monstr()
+
+fig,ax = viz.init_monplot(1,1,figsize=(8,4))
+for n in range(ndt):
+    plotvar = monvar[n]
+    ax.plot(mons3,plotvar,label=expnames[n],c=expcols[n],ls=els[n],lw=2)
+ax.legend()
+ax.set_ylabel("Monthly Standard Deviation (degC)")
+
+
+#%% Lets quickly calculate some other metrics
+
+lags    = np.arange(61)
+metrics = scm.compute_sm_metrics([ds.data for ds in aavgs],lags=lags,detrend_acf=False,nsmooth=2)
+
+#%% Plot the ACF
+
+kmonth = 2
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,3.5))
+
+ax,_ = viz.init_acplot(kmonth,lags[::3],lags,ax=ax)
+
+for n in range(ndt):
+    plotvar = metrics['acfs'][kmonth][n]
+    ax.plot(lags,plotvar,label=expnames[n],c=expcols[n],ls=els[n],lw=2)
+ax.legend(ncol=3)
+ax.set_ylabel("Correlation with %s Anomalies" % (mons3[kmonth]))
+
+#%% Plot the power spectra  
+
+decadal_focus = False
+
+dtmon_fix       = 60*60*24*30
+
+if decadal_focus:
+    xper            = np.array([10,7,5,3,1,0.5])
+else:
+    xper            = np.array([40,10,7,5,3,1,0.5])
+xper_ticks      = 1 / (xper*12)
+
+fig,ax      = plt.subplots(1,1,figsize=(8,4.5),constrained_layout=True)
+
+for ii in range(ndt):
+
+    plotspec        = metrics['specs'][ii] / dtmon_fix
+    plotfreq        = metrics['freqs'][ii] * dtmon_fix
+    CCs             = metrics['CCs'][ii] / dtmon_fix
+
+    ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames[ii],c=expcols[ii],ls=els[ii])
+    
+    #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
+    #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
+
+ax.set_xlim([xper_ticks[0],0.5])
+ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(3*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(7*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+
+ax.set_xlabel("Frequency (1/Month)",fontsize=14)
+ax.set_ylabel("Power [$\degree C ^2 cycle \, per \, mon$]")
+
+ax2 = ax.twiny()
+ax2.set_xlim([xper_ticks[0],0.5])
+ax2.set_xscale('log')
+ax2.set_xticks(xper_ticks,labels=xper)
+ax2.set_xlabel("Period (Years)",fontsize=14)
+
+
+# # Plot Confidence Interval (ERA5)
+# alpha           = 0.05
+# cloc_era        = [plotfreq[0],1e-1]
+# dof_era         = metrics_out['dofs'][-1]
+# cbnds_era       = proc.calc_confspec(alpha,dof_era)
+# proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+
+ax.legend()
+
+
+#%% Function Workshop (write and ND xarray detrender)
+
+
+def xrdetrend_nd(invar,order,regress_monthly=False,return_fit=False):
+    # Given an DataArray [invar] and order
+    # Fit the timeseries and detrend
+    
+    # Change to [lon x lat x time]
+    reshape_flag = False
+    try:
+        invar       = invar.transpose('lon','lat','time')
+        invar_arr   = invar.data # [lon x lat x time]
+        
+    except:
+        print("Warning, input is not 3d or doesn't have ('lon','lat','time')")
+        reshape_output = proc.make_2d_ds(invar,keepdim='time') #[1 x otherdims x time]
+        invar_arr      = reshape_output[0].data
+        reshape_flag = True
+    
+    # Filter out NaN points
+    nlon,nlat,ntime = invar_arr.shape
+    invar_rs = invar_arr.reshape(nlon*nlat,ntime) # Space x Time
+    nandict  = proc.find_nan(invar_rs,1,return_dict=True)
+    
+    if regress_monthly: # Do regression separately for each month
+    
+        # Reshape to space x yr x mon
+        cleaned_data = nandict['cleaned_data']
+        nok,_        = cleaned_data.shape
+        nyr          = int(ntime/12)
+        cd_yrmon     = cleaned_data.reshape((nok,nyr,12)) # Check 
+        
+        # Preallocate and detrend separately for each month
+        detrended_bymon = np.zeros(cd_yrmon.shape)*np.nan # Detrended Variable
+        fit_bymon       = detrended_bymon.copy() # n-order polynomial fit
+        for im in range(12):
+            # Get data for month
+            cdmon                   = cd_yrmon[:,:,im]
+            xdim                    = np.arange(nyr)
+            detrended_mon,fit_mon   = proc.detrend_poly(xdim,cdmon,order)
+            detrended_bymon[:,:,im] = detrended_mon.T
+            fit_bymon[:,:,im]       = fit_mon
+            
+            # Debug Plot (by month)
+            # ii = 22
+            # fig,ax = plt.subplots(1,1)
+            # ax.plot(xdim,detrended_mon[:,ii],label="Detrended",color='blue')
+            # ax.plot(xdim,fit_mon[ii,:],label="Fit",color="red")
+            # ax.plot(xdim,cdmon[ii,:],label="Raw",color='gray',ls='dashed')
+            # ax.legend()
+        
+        # Reshape the variables
+        detrended_bymon = detrended_bymon.reshape(nok,ntime) # [Space x Time]
+        fit_bymon = fit_bymon.reshape(nok,ntime) # [Space x Time]
+        
+        # # Debug Plot (full timeseries)
+        # ii = 77
+        # fig,ax = plt.subplots(1,1)
+        # xdim = np.arange(ntime)
+        # ax.plot(xdim,detrended_bymon.T[:,ii],label="Detrended",color='blue')
+        # ax.plot(xdim,data_fit[ii,:],label="Fit",color="red")
+        # ax.plot(xdim,nandict['cleaned_data'][ii,:],label="Raw",color='gray',ls='dashed')
+        # ax.legend()
+        
+        # Replace Detrended data in original array
+        arrout = np.zeros((nlon*nlat,ntime)) * np.nan
+        arrout[nandict['ok_indices'],:] = detrended_bymon
+        arrout = arrout.reshape(nlon,nlat,ntime).transpose(2,1,0) # Flip to time x lat x lon
+        
+        if return_fit:
+            fitout = np.zeros((nlon*nlat,ntime)) * np.nan
+            fitout[nandict['ok_indices'],:] = fit_bymon
+            fitout = fitout.reshape(nlon,nlat,ntime).transpose(2,1,0)
+        
+    else: # Do regression for all months together...
+        
+        # Apply a fit using proc.detrend_poly
+        xdim = np.arange(invar.shape[-1]) # Length of time dimension
+        data_detrended,data_fit = proc.detrend_poly(xdim,nandict['cleaned_data'],order)
+        #data_detrended         # [time x space]
+        #data_fit               # [space x Time]
+        #nandict['cleaned_data' # [space x time]
+        
+        # # Debug Plot
+        ii = 77
+        fig,ax = plt.subplots(1,1)
+        ax.plot(xdim,data_detrended[:,ii],label="Detrended",color='blue')
+        ax.plot(xdim,data_fit[ii,:],label="Fit",color="red")
+        ax.plot(xdim,nandict['cleaned_data'][ii,:],label="Raw",color='gray',ls='dashed')
+        ax.legend()
+        
+        # Replace Detrended data in original array
+        arrout = np.zeros((nlon*nlat,ntime)) * np.nan
+        arrout[nandict['ok_indices'],:] = data_detrended.T
+        arrout = arrout.reshape(nlon,nlat,ntime).transpose(2,1,0) # Flip to time x lat x lon
+        
+        if return_fit:
+            fitout = np.zeros((nlon*nlat,ntime)) * np.nan
+            fitout[nandict['ok_indices'],:] = data_fit
+            fitout = fitout.reshape(nlon,nlat,ntime).transpose(2,1,0)
+    
+    # Replace into data array
+    
+    
+    # Prepare Output as DataArrays # [(time) x lat x lon]
+    if reshape_flag is False: # Directly transpose and assign coords [time x lat x lon]
+        coords_full     = dict(time=invar.time,lat=invar.lat,lon=invar.lon)
+        if regress_monthly: # Add "mon" coordinate for monthly regression
+            coords          = dict(mon=np.arange(1,13,1),lat=invar.lat,lon=invar.lon)
+        else:
+            coords          = dict(lat=invar.lat,lon=invar.lon)
+        
+        da_detrend      = xr.DataArray(arrout,coords=coords_full,dims=coords_full,name=invar.name)
+        if return_fit:
+            da_fit          = xr.DataArray(fitout,coords=coords_full,dims=coords_full,name='fit')
+    
+    else: # Need to undo reshaping and reassign old coords...
+        da_detrend      = reshape_2d_ds(arrout,invar,reshape_output[2],reshape_output[1])
+        da_fit          = reshape_2d_ds(fitout,invar,reshape_output[2],reshape_output[1])
+        
+    if return_fit:
+        dsout = xr.merge([da_detrend,da_fit])
+    else:
+        dsout = da_detrend
+    return dsout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+
+
+
+#%%
 
 #%% Find File and Load Variable
 
