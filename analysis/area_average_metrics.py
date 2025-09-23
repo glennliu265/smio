@@ -223,7 +223,6 @@ expls           = ["dashed","dotted",'solid']
 # expls           = ["dashed","dotted","dotted",'solid']
 
 
-
 # # (8) ORAS5 MLD Comparison
 # comparename     = "MLDComparison"
 # expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_mld003","SST_ERA5_1979_2024"]
@@ -231,6 +230,24 @@ expls           = ["dashed","dotted",'solid']
 # expnames_short  = ["MIMOC","ORAS5","ERA5"]
 # expcols         = ["hotpink","navy","k"]
 # expls           = ["dotted","dashed",'solid']
+
+
+# (9) Forcing EOF vs Std Comparison
+comparename     = "ForcingComparison"
+expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_EOF","SST_ERA5_1979_2024"]
+expnames_long   = ["stdev(F') Forcing","EOF-based Forcing","ERA5"]
+expnames_short  = ["Fstd","EOF","ERA5"]
+expcols         = ["hotpink","navy","k"]
+expls           = ["dotted","dashed",'solid']
+
+# (10) Linear Detrend (All Month) vs GMSST Removal (Sep Month)
+comparename     = "DetrendingEffect"
+expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_GMSST","SST_ORAS5_avg_GMSSTmon","SST_ERA5_1979_2024"]
+expnames_long   = ["LinearDetrend","GMSST","GMSSTmon","ERA5"]
+expnames_short  = ["LinearDetrend","GMSST","GMSSTmon","ERA5"]
+expcols         = ["hotpink","cornflowerblue","navy","k"]
+expls           = ["dotted",'solid',"dashed",'solid']
+detect_blowup   = True
 
 
 #%% Load information for each region
@@ -243,6 +260,34 @@ for ex in tqdm.tqdm(range(nexps)):
     
     ds      = xr.open_dataset(ncname).load()
     dsall.append(ds)
+    
+#%% Temp Fix, remove chunks where the model blows up...
+
+# def detect_blowup(ds,vname,chunk,thres):
+#     ntime = ds[vname].shape[0]
+#     niter = int(ntime/chunk)
+    
+#     for ii in range(niter):
+        
+#         # Get Chunk
+#         id0 = ii*chunk
+#         id1 = (ii+1) * chunk
+        
+#         #ids = np.arange(ii*chunk,(ii+1)*chunk)
+#         dschunk = ds[vname].isel(time=slice(id0,id1))
+        
+#         if np.any(np.abs(dschunk) > thres):
+            
+#             print("Exceeded threshold in chunk %i to %i" % (id0,id1))
+#             dsbefore = ds.isel(time=slice(None,id0))
+#             dsafter  = ds.isel(time=slice(id1,None))
+#             ds = xr.concat([dsbefore,dsafter],dim='time')
+
+#     return ds
+
+if detect_blowup:
+    dsall = [proc.detect_blowup(ds,'SST',12000,10) for ds in dsall]
+    
 
     
 #%% Preprocessing
@@ -264,7 +309,7 @@ if (detrend_obs_regression):
     
     # Load GMSST
     ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MaxIce.load()
-    dsdtera5     = proc.detrend_by_regression(sst_era,ds_gmsst)
+    dsdtera5     = proc.detrend_by_regression(sst_era,ds_gmsst,regress_monthly=True)
     
     sst_era_dt = dsdtera5.SST.squeeze()
     
@@ -341,7 +386,7 @@ for kmonth in range(12):
 
 
 #%% Plot Spectra
-decadal_focus = False
+decadal_focus = True
 
 dtmon_fix       = 60*60*24*30
 
