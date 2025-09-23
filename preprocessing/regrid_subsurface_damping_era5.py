@@ -22,7 +22,8 @@ import cartopy.crs as ccrs
 
 #%% Load Files
 
-dataset_name = "ORAS5_avg_mld003"
+dataset_name = "ORAS5_avg" #"ORAS5_avg_mld003"
+detrend      = "GMSST"
 
 #"oras5_mld_clim_cds"
 #"ORAS5_avg" 
@@ -61,7 +62,10 @@ elif dataset_name == "ORAS5":
     
 elif dataset_name == "ORAS5_avg":
     path_ora = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-    ncin     = path_ora + "ORAS5_avg_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
+    if detrend == "linear":
+        ncin     = path_ora + "ORAS5_avg_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
+    else:
+        ncin     = path_ora + "ORAS5_avg_MIMOC_corr_d_TEMP_detrend%s_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc" % detrend
     dsora    = xr.open_dataset(ncin).load()#.lbd_d
     vname = "lbd_d"
     ds_in = dsora
@@ -130,6 +134,16 @@ latera5     = dsera5.lat.load()
 plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=11)),plt.colorbar(),plt.show()
 plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=9)),plt.colorbar(),plt.show()
 
+# Note it seems in month 6 there are some odd features...
+plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=4)),plt.colorbar(),plt.show()
+
+for im in range(12):
+   
+    plt.scatter(ds_in.TLONG,ds_in.TLAT,c=ds_in[vname].isel(mon=im)),plt.colorbar(),
+    plt.title("Mon %i" % (im+1))
+    plt.show()
+    
+
 #%% Prepare Regridding
 
 
@@ -170,8 +184,8 @@ edict       = {vname : {'zlib':True}}
 lbdd_regridded.to_netcdf(ncout,encoding=edict)
 
 #%% Compare Regridding
-imon = 9
 
+imon        = 5
 proj        = ccrs.PlateCarree()
 lbdin       = [dsen4,lbdd_regridded]
 lbdnames    = ["EN4 (1deg)","EN4 (0.25deg)"]

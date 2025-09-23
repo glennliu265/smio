@@ -47,6 +47,10 @@ import scm
 
 import amv.proc as hf # Update hf with actual hfutils script, most relevant functions
 import amv.loaders as dl
+
+
+
+
 #%% User Edits
 
 # Plot Settings
@@ -67,12 +71,21 @@ plotmask = xr.where(np.isnan(icemask),0,icemask)
 #%% (1) Load ERA5 HFF
 # =========================
 
+
+detrend         = "GMSST"#"1"
 flxname         = "qnet"
-dpath           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
+if detrend == "1": # Path to old data
+    dpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
+else: # Path to new data after detrend format update
+    dpath       = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/hff/"
+    
 if flxname == "qnet":
     dof   = (2024-1979 + 1 - 2 - 1) * 3
     vname           = "qnet_damping"
-    ncname_era5     = "ERA5_qnet_hfdamping_NAtl_1979to2024_ensorem1_detrend1.nc"
+    if detrend == "1": # hfdamping
+        ncname_era5     = "ERA5_qnet_hfdamping_NAtl_1979to2024_ensorem1_detrend%s.nc" % detrend
+    else:
+        ncname_era5     = "ERA5_qnet_damping_NAtl_1979to2024_ensorem1_detrend%s.nc" % detrend
 else:
     dof   = (2021-1979 + 1 - 2 - 1) * 3
     vname           = "thflx_damping"
@@ -106,7 +119,7 @@ p20        : Use p = 0.20
 AConly     : Test Autocorrelation Only
 
 """
-signame = "p10"#"noPositive"#"pilot" #"noPositive" # 
+signame = "AConly" #"p10"#"noPositive"#"pilot" #"noPositive" # 
 print("Significance Testing Option is: %s" % (signame))
 
 hff   = damping_era5.copy()
@@ -231,6 +244,8 @@ fig,ax,_  = viz.init_orthomap(1,1,bboxplot=bbplot2,figsize=(12,8),centlon=-25)
 pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                     transform=proj,
                     cmap='cmo.balance',vmin=-35,vmax=35,zorder=-2)
+lon = plotvar.lon
+lat = plotvar.lat
 
 # Plot Negative Points
 viz.plot_mask(plotvar.lon,plotvar.lat,isneg.T,reverse=True,
@@ -238,7 +253,8 @@ viz.plot_mask(plotvar.lon,plotvar.lat,isneg.T,reverse=True,
 
 
 plotvar   = plotmask
-ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=[0,1],transform=proj,colors='cyan',zorder=-1)
+
+ax.contour(lon,lat,plotvar,levels=[0,1],transform=proj,colors='cyan',zorder=-1)
 
 ax        = viz.add_coast_grid(ax,bbox=bbplot2,proj=proj,fill_color="k")
 viz.plot_box(bbsim,ax=ax,color='limegreen',linewidth=2.5,proj=proj)
@@ -269,7 +285,10 @@ da          = xr.DataArray(dampingout,name='damping',
 
 edict = proc.make_encoding_dict(da)
 outpath_damping = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
-outname         = outpath_damping + "ERA5_%s_damping_%s.nc" % (flxname,signame)
+if detrend == "1":
+    outname         = outpath_damping + "ERA5_%s_damping_%s.nc" % (flxname,signame,detrend)
+else: # For new format add the detrend in
+    outname         = outpath_damping + "ERA5_%s_damping_%s_detrend%s.nc" % (flxname,signame,detrend)
 print("Saving to %s" % outname)
 da.to_netcdf(outname,encoding=edict)
 
@@ -396,9 +415,10 @@ ds_ice_out = xr.where(ds_ice == 1,np.nan,1)
 
 
 vname   = "QNET"
-dampstr = "QNETpilotObsAConly"
+dampstr = "QNETgmsst"#QNETpilotObsAConly"
 ncpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-ncname = "ERA5_Fprime_%s_timeseries_%s_nroll0_NAtl.nc"  % (vname,dampstr) #"ERA5_Fprime_%s_timeseries_%spilotObs_nroll0_NAtl.nc" % (vname,vname)
+ncname = "ERA5_Fprime_%s_timeseries_%s_nroll0_NAtl.nc"  % (vname,dampstr) 
+#"ERA5_Fprime_%s_timeseries_%spilotObs_nroll0_NAtl.nc" % (vname,vname)
 ds     = xr.open_dataset(ncpath+ncname).load()
 
 # COmpute the monthly standard deviation

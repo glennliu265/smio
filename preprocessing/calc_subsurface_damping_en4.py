@@ -109,10 +109,11 @@ ORAS5_avg_mld003
 """
 
 
-dataset_name = "ORAS5_avg_mld003" # EN4 # Indicate which Dataset
+dataset_name ="ORAS5_avg"  #"ORAS5_avg_mld003" # EN4 # Indicate which Dataset
 
 
 mldname = "MIMOC"
+
 st = time.time()
 if dataset_name == "EN4":
     # Load EN4 Profiles
@@ -199,14 +200,11 @@ proc.printtime(st,print_str="Loaded")
 
 # Load GMSST For ERA5 Detrending
 detrend_obs_regression = True
-dpath_gmsst     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-nc_gmsst        = "ERA5_GMSST_1979_2024.nc"
-ds_gmsst        = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
-
+dpath_gmsst            = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst               = "ERA5_GMSST_1979_2024.nc"
+ds_gmsst               = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MeanIce.load()
 
 #%% Detrainment calculation Options
-
-
 
 # Set Time Period Strings
 tstr    = "%04ito%04i" % (tstart,tend)
@@ -217,7 +215,7 @@ nlags   = len(lags)
 lagmax  = 3
 
 # detrend = 'ensmean'
-detrend = 'gmsst' # Set to None to do a linear detrend
+detrend = "GMSST" #'gmsst' # Set to None to do a linear detrend
 
 
 #%% First, restrict MLD and calculate kprev
@@ -261,11 +259,34 @@ ds_temp = ds_temp.isel(depth=slice(0,idx_deeper+1))
 #%% Reprocess and detrend (took 82 sec for NATL ORAS5, 2.36 sec for SPGNE)
 
 dtvar_anom = proc.xrdeseason(ds_temp)
-if detrend == "gmsst":
-    dtout      = proc.detrend_by_regression(dtvar_anom,ds_gmsst)
-    dtvar_anom = dtout['TEMP']
+dsa        = dtvar_anom
+vname      = "TEMP"
+if detrend == "linear" or detrend == "1": # (1): Simple Linear Detrend (9.68s)
+    dsadt    = proc.xrdetrend(dsa)
+elif detrend == "linearmon":
+    dsadt    = proc.xrdetrend_nd(dsa,1,return_fit=False,regress_monthly=True)
+elif detrend == 'quadratic':
+    dsadt    = proc.xrdetrend_nd(dsa,2,return_fit=False)
+elif detrend == "quadraticmon":
+    dsadt   = proc.xrdetrend_nd(dsa,2,return_fit=False,regress_monthly=True)
+elif detrend == "GMSST":
+    # (3): Removing GMSST
+    gmout       = proc.detrend_by_regression(dsa,ds_gmsst)
+    dsadt        = gmout[vname]
+elif detrend == "GMSSTmon":
+    gmoutmon    = proc.detrend_by_regression(dsa,ds_gmsst,regress_monthly=True)
+    dsadt        = gmoutmon[vname]
 else:
-    dtvar_anom = proc.xrdetrend(dtvar_anom)
+    print("No detrending will be performed...")
+    
+dtvar_anom   = dsadt
+        
+# Old Detrending Sequence        
+# if detrend == "gmsst":
+#     dtout      = proc.detrend_by_regression(dtvar_anom,ds_gmsst)
+#     dtvar_anom = dtout['TEMP']
+# else:
+#     dtvar_anom = proc.xrdetrend(dtvar_anom)
 
 
 #%% Retrieve Dimensions and reshape to year x mon
@@ -415,7 +436,7 @@ else: # 1-D coorindates Case (EN4)
 
 edict      = proc.make_encoding_dict(ds_out)
 savename   = "%s%s_%s_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,mldname,
-                                                                       'TEMP','linear',lagmax,tstr)
+                                                                       'TEMP',detrend,lagmax,tstr)
 ds_out.to_netcdf(savename,encoding=edict)
 
 #%% Use the ACFs to compute the detrainment, correlation based
@@ -487,7 +508,7 @@ for a in tqdm.tqdm(range(nlat)):
         if mld2d:
             hpt  = proc.find_tlatlon(ds_mld,lonf,latf,verbose=False).mld
         else:
-            hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
+            hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest')#.values#[month]
         if np.all(np.isnan(hpt)): # Skip for land point
             continue
         
@@ -574,8 +595,9 @@ for a in tqdm.tqdm(range(nlat)):
                 
                 corr_mon = corr_floor
             corr_out[im,a,o] = corr_mon.copy()
-#%%
-# Save the output (for a variable and ensemble member)
+            
+#%% Save the output (for a variable and ensemble member)
+
 if coords2D:
     nlat       = np.arange(0,nlat)
     nlon       = np.arange(0,nlon)
@@ -588,14 +610,13 @@ else:
     
     da_out = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
 edict  = {'lbd_d':{'zlib':True}}
-savename = "%s%s_%s_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,mldname,"TEMP","RAW",lagmax,
+savename = "%s%s_%s_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,mldname,"TEMP",detrend,lagmax,
                                                                                                   interpcorr,detrainceil,imshift,dtdepth,tstr)
 da_out.to_netcdf(savename,encoding=edict)                
 
 #%% Check Results
 
 if coords2D:
-    
     for im in range(12):
         plt.scatter(da_out.TLONG,da_out.TLAT,c=da_out.lbd_d.isel(mon=im),),plt.colorbar(),plt.show()
 else:
