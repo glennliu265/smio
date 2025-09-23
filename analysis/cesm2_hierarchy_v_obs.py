@@ -47,9 +47,9 @@ import cvd_utils as cvd
 dpath           = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/NAtl/Old/"
 
 # Load GMSST For ERA5 Detrending
-detrend_obs_regression = True
-dpath_gmsst     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-nc_gmsst        = "ERA5_GMSST_1979_2024.nc"
+detrend_obs_regression  = True
+dpath_gmsst             = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst                = "ERA5_GMSST_1979_2024.nc"
 
 # Set Figure Path
 figpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250625/"

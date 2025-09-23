@@ -192,7 +192,7 @@ def calc_monthly_eof(daf,bboxeof,N_mode=None,concat_ens=True,mask=None,bbox_chec
 
 # Load Fprime
 fpath           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-fnc             = "ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
+fnc             = "ERA5_Fprime_QNET_timeseries_QNETgmsstMON_nroll0_NAtl.nc"#"ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
 ds_fprime       = xr.open_dataset(fpath + fnc).load()
 
 

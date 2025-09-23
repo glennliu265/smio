@@ -98,8 +98,8 @@ dsanom = proc.xrdeseason(dsreg).sst
 # %% Now Perform Monthly regression (based on function)
 
 
-invar = dsanom
-in_ts = ds_gmsst_sel
+invar           = dsanom
+in_ts           = ds_gmsst_sel
 regress_monthly = True
 
 mon1 = proc.detrend_by_regression(invar, in_ts, regress_monthly=True)
