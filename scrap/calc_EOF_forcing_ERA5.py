@@ -8,7 +8,6 @@ Notes
     - Currently written to run on Astraeus (local)
     - Copied [check_Fprime_EOF.py] and modified... on 2025.09.17
 
-
 Created on Wed Sep 17 09:58:00 2025
 
 @author: gliu
@@ -195,7 +194,6 @@ fpath           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdam
 fnc             = "ERA5_Fprime_QNET_timeseries_QNETgmsstMON_nroll0_NAtl.nc"#"ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
 ds_fprime       = xr.open_dataset(fpath + fnc).load()
 
-
 # Load Ice Mask
 dsmask_era5     = dl.load_mask(expname='ERA5').mask
 dsmaskplot      = xr.where(np.isnan(dsmask_era5),0,1)
@@ -229,8 +227,9 @@ eof_out    = calc_monthly_eof(ds_fprime.Fprime.squeeze(),bboxeof,N_mode=N_mode,m
 
 target_var = ds_fprime.Fprime
 eof_thres  = 0.90
+usevar     = True#True # True to use variance rather than stdev
 
-def compute_eof_correction(eof_out,target_var,eof_thres):
+def compute_eof_correction(eof_out,target_var,eof_thres,usevar=False):
     """
     eof_out: Dataset from [calc_monthly_eof] containing:
         eofs  : EOF Patterns       [Mode x Mon x Lat x Lon] (see original script in <correct_eof_forcing_SSS> for a version that supports ensembles)
@@ -242,7 +241,10 @@ def compute_eof_correction(eof_out,target_var,eof_thres):
     """
     
     # (1) Calculate Monthly Variance of the target variable
-    target_monvar = target_var.groupby('time.month').std('time') # [mon x ens x lat x lon]
+    if usevar:
+        target_monvar = target_var.groupby('time.month').var('time') # [mon x ens x lat x lon]
+    else:
+        target_monvar = target_var.groupby('time.month').std('time') # [mon x ens x lat x lon]
     target_monvar = target_monvar.rename({'month':'mon'})
     
     # (2) Transpose and prep variables for input
@@ -277,7 +279,10 @@ def compute_eof_correction(eof_out,target_var,eof_thres):
     filt_out = xr.merge([ds_eofs_filtered,ds_varexp_cumu,ds_varexps_filt,ds_nmodes_needed])
     
     # (4) Compute Stdev of EOFs
-    eofs_std = np.sqrt((ds_eofs_filtered**2).sum('mode'))
+    if usevar:
+        eofs_std = (ds_eofs_filtered**2).sum('mode')
+    else: # Take Squareroot for standard deviation
+        eofs_std = np.sqrt((ds_eofs_filtered**2).sum('mode'))
     
     # Compute pointwise correction
     correction_diff = monvar_in - eofs_std
@@ -287,7 +292,7 @@ def compute_eof_correction(eof_out,target_var,eof_thres):
     filt_out['threshold'] = eof_thres
     return filt_out
 
-filt_out = compute_eof_correction(eof_out,target_var,eof_thres)
+filt_out = compute_eof_correction(eof_out,target_var,eof_thres,usevar=usevar)
 filt_out = filt_out.rename(dict(eofs="Fprime"))
 
 
@@ -296,6 +301,8 @@ filt_out = filt_out.rename(dict(eofs="Fprime"))
 
 fpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 fname = "%s%s_EOFFilt%03i_corrected.nc" % (fpath,fnc[:-3],eof_thres*100)
+if usevar:
+    fname = proc.addstrtoext(fname,"_usevar",adjust=-1)
 
 edict = proc.make_encoding_dict(filt_out)
 
