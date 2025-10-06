@@ -11,12 +11,12 @@ Created on Tue Sep 23 15:40:51 2025
 """
 
 
-from amv import proc, viz
+#from amv import proc, viz
 import scipy as sp
-import yo_box as yo
-import cvd_utils as cvd
-import amv.loaders as dl
-import scm
+#import yo_box as yo
+#import cvd_utils as cvd
+#import amv.loaders as dl
+#import scm
 import numpy as np
 import xarray as xr
 import sys
@@ -29,6 +29,9 @@ import matplotlib.patheffects as PathEffects
 import glob
 import tqdm
 
+
+
+
 # %%
 
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/"  # amv module
@@ -36,6 +39,12 @@ scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_S
 
 sys.path.append(amvpath)
 sys.path.append(scmpath)
+
+from amv import proc, viz
+import yo_box as yo
+import cvd_utils as cvd
+import amv.loaders as dl
+import scm
 
 
 # %% Load data
@@ -122,7 +131,6 @@ def pointwise_coherence(ts1, ts2, opt=1, nsmooth=100, pct=0.10, return_ds=False)
 
 # %% Preprocess
 
-
 # Transport Components
 comps = [b'Total', b'Eulerian-Mean Advection',
          b'Eddy-Induced Advection (bolus) + Diffusion',
@@ -157,14 +165,17 @@ spgneid     = proc.area_avg_cosweight(sstreg)
 
 # %% Calculate Correlation
 
-filts = [None, 5*12, 10*12, 20*12]
-nfilt = len(filts)
-border = 6
+#calc_r2 = True
+calc_r2 = True
+filts   = [None, 5*12, 10*12, 20*12]
+nfilt   = len(filts)
+border  = 6
 
 ntime, nlat = amocidx.shape
 
 corr_by_lat       = np.zeros((nfilt, nlat))
 corr_by_lat_nheat = np.zeros((nfilt, nlat))
+
 dofeff = corr_by_lat.copy()
 
 for ff in range(nfilt):
@@ -176,14 +187,19 @@ for ff in range(nfilt):
         spgin = proc.lp_butter(spgneid.data, filtin, border)
     
     for a in range(nlat):
+        
+        corr_by_lat[ff, a]      = np.corrcoef(spgin, amocidx[:, a])[0, 1]
+        if calc_r2:
+            corr_by_lat[ff, a] = (corr_by_lat[ff, a])** 2 
 
-        corr_by_lat[ff, a] = np.corrcoef(spgin, amocidx[:, a])[0, 1]
-
-        dofeff[ff, a] = proc.calc_dof(spgin, ts1=amocidx[:, a])
+        
+        dofeff[ff, a]           = proc.calc_dof(spgin, ts1=amocidx[:, a])
         
         corr_by_lat_nheat[ff,a] = np.corrcoef(spgin, nheata.data[:, a])[0, 1]
+        if calc_r2:
+            corr_by_lat_nheat[ff,a] = (corr_by_lat_nheat[ff,a]) ** 2
 
-rhocrit = proc.ttest_rho(0.05, 1, len(spgin))
+rhocrit    = proc.ttest_rho(0.05, 1, len(spgin))
 rhocriteff = proc.ttest_rho(0.05, 1, dofeff)
 
 # %% Plot Correlation vs Latitude
@@ -191,10 +207,10 @@ rhocriteff = proc.ttest_rho(0.05, 1, dofeff)
 expcols = ["k", "magenta", "blue", "green"]
 
 
-xtks = np.arange(0, 95, 5)
+xtks    = np.arange(0, 95, 5)
 
-lat = moca.lat_aux_grid
-z = moca.moc_z/100
+lat     = moca.lat_aux_grid
+z       = moca.moc_z/100
 
 fig, ax = plt.subplots(1, 1, constrained_layout=True, figsize=(12.5, 4))
 
@@ -211,7 +227,10 @@ for ff in range(nfilt):
     
 
 ax.set_xticks(xtks)
-ax.set_ylabel("Correlation")
+if calc_r2:
+    ax.set_ylabel("$R^2$")
+else:
+    ax.set_ylabel("Correlation")
 ax.set_xlabel("Latitude")
 
 ax.axvline([52], c='magenta', ls='dotted')
@@ -476,18 +495,24 @@ def calc_sig_coherence(alpha, dof, coh_sq=True, approx=False):
 
 
 # Select Filtering
-filt = 20*12#None#20*12  # None
+filt    = None #20*12#None#20*12  # None
 filtstr = str(filt)
 
 # Indicate Latitude
-latf = 36.5
+latf = 41.56
 ts1 = spgneid.data
+
+use_nheat=True
 
 
 # Get Timeseries
 if filt is not None:
     ts1 = proc.lp_butter(ts1, filt, 6)
-ts2 = proc.xrdeseason(amocidx.sel(lat_aux_grid=latf, method='nearest')).data
+    
+if use_nheat:
+    ts2 = nheata.sel(lat_aux_grid=latf, method='nearest').data
+else:
+    ts2 = proc.xrdeseason(amocidx.sel(lat_aux_grid=latf, method='nearest')).data
 
 # Compute Coherence
 cout_raw = pointwise_coherence(ts1, ts2, nsmooth=nsmooth, return_ds=True)
@@ -571,12 +596,18 @@ ax2.set_xlabel("Period (Years)", fontsize=14)
 
 ax.set_ylim([1e-9, 1e1])
 
+
 if filt is not None:
     ax.set_title("Coherence Squared (%i-month Filtered SPGNE SST vs. AMOC @ %.2f$\degree$N)" %
                  (filt, latf), fontsize=18)
 else:
-    ax.set_title(
-        "Coherence Squared (SPGNE SST vs. AMOC @ %.2f$\degree$N)" % (latf), fontsize=18)
+    
+    if use_nheat:
+        ax.set_title(
+            "Coherence Squared (SPGNE SST vs. N_HEAT @ %.2f$\degree$N)" % (latf), fontsize=18)
+    else:
+        ax.set_title(
+            "Coherence Squared (SPGNE SST vs. AMOC @ %.2f$\degree$N)" % (latf), fontsize=18)
 
 figname = "%sCoherenceSq_SPGNE_AMOC%02i_filt%s_mciter%i.png" % (
     figpath, latf, filtstr, mciter)
@@ -594,7 +625,9 @@ proc.xrdeseason(amocidx.sel(lat_aux_grid=26,method='nearest')).plot(ax=ax1)
 
 #%% Do simple covariance calculations
 
-latf                = 36.5
+filt=None
+
+latf                = 41.56
 tsraw               = spgneid.data
 tsraw_lp            = proc.lp_butter(tsraw,120,6)
 amocin              = amocidx.sel(lat_aux_grid=latf,method='nearest').data
@@ -646,6 +679,284 @@ ax.set_xticks(xtks)
 
 
 np.cov(ts1,ts2)
+
+
+#%% Try to compute R2 for different lags
+
+both_filt = True
+filtin   = 10*12
+border   = 6
+leadlags = np.arange(-60,61,1)
+
+
+# abyfilt = []
+# nbyfilt = []
+
+
+# for ff in range(nfilt):
+#     filtin = filts[ff]
+    
+if filtin is None:
+    spgin = spgneid.data
+else:
+    spgin = proc.lp_butter(spgneid.data, filtin, border)
+
+nleadlags   = len(leadlags)
+amoc_corrs  = np.zeros((nlat,nleadlags))
+nheat_corrs = amoc_corrs.copy()
+
+
+for a in tqdm.tqdm(range(nlat)):
+    
+    amocin    = amocidx[:, a].data
+    nheatin   = nheata.data[:, a]
+    
+    if both_filt and filtin is not None:
+        amocin  = proc.lp_butter(amocin, filtin, border)
+        nheatin = proc.lp_butter(nheatin, filtin, border)
+        
+        
+        
+    amoclags  = calc_lag_corr_1d(amocin,spgin,leadlags)
+    nheatlags = calc_lag_corr_1d(nheatin,spgin,leadlags)
+        
+    # amoclags  = calc_lag_corr_1d(spgin,amocin,leadlags)
+    # nheatlags = calc_lag_corr_1d(spgin,nheatin,leadlags)
+    
+    amoc_corrs[a,:] = amoclags.copy()
+    nheat_corrs[a,:] = nheatlags.copy()
+    
+
+# abyfilt.append(amoc_corrs)
+# nbyfilt.append(nheat_corrs)
+
+    
+# abyfilt = np.array(abyfilt)
+# nbyfilt = np.array(nbyfilt)
+        
+# #% Save the Output
+
+
+# coords = dict(filt=filts,lat=lat,lag=leadlags)
+
+# daout_amoc  = xr.DataArray(abyfilt,coords=coords,dims=coords,name='amoc')
+# daout_nheat = xr.DataArray(nbyfilt,coords=coords,dims=coords,name='n_heat')
+
+
+
+    
+    
+#%% Try to Plot the Output
+
+calc_r2    = True
+plot_lag0  = False
+plot_lagvalue = False
+expcols    = ["k", "magenta", "blue", "green"]
+
+
+xtks    = np.arange(0, 95, 5)
+
+lat     = moca.lat_aux_grid
+z       = moca.moc_z/100
+
+if filtin is not None:
+    lab     = "%i-month LP Filter" % filtin
+else:
+    lab = "Raw"
+
+fig, ax= plt.subplots(1, 1, constrained_layout=True, figsize=(12.5, 4))
+
+if plot_lag0:
+    ax.plot(lat, amoc_corrs[:,60]**2, label="AMOC Transport " + lab, c='midnightblue')
+    ax.plot(lat, nheat_corrs[:,60]**2, label="N_HEAT " + lab, c='salmon',ls='dotted')
+else:
+    
+    if plot_lagvalue:
+        ax.scatter(lat, leadlags[(amoc_corrs[:,:]**2).argmax(1)], label="AMOC Transport " + lab, c='midnightblue')
+        ax.scatter(lat, leadlags[(nheat_corrs[:,:]**2).argmax(1)], label="N_HEAT " + lab, c='salmon',ls='dotted')
+        
+    else:
+        ax.plot(lat, (amoc_corrs[:,:]**2).max(1), label="AMOC Transport " + lab, c='midnightblue')
+        ax.plot(lat, (nheat_corrs[:,:]**2).max(1), label="N_HEAT " + lab, c='salmon',ls='dotted')
+        
+    # Also Plot index of maximum Lag
+    # ax2 = ax.twinx()
+    # ax2.scatter(lat, leadlags[(amoc_corrs[:,:]**2).argmax(1)], label="AMOC Transport " + lab, c='midnightblue')
+    # ax2.scatter(lat, leadlags[(nheat_corrs[:,:]**2).argmax(1)], label="N_HEAT " + lab, c='salmon',ls='dotted')
+    
+#ax.plot(lat, corr_by_lat[ff, :], label="Original", c="k",ls='dashed')
+print("Max Lat for AMOC R2 is %.2f" % (lat[(amoc_corrs[:,:]**2).max(1).argmax()].item()))
+print("Max Lat for N_HEAT R2 is %.2f" % (lat[(nheat_corrs[:,:]**2).max(1).argmax()].item()))
+
+
+
+#a#x.plot(lat, rhocriteff[ff, :], ls='dashed', lw=.75, c=expcols[ff])
+#ax.plot(lat, corr_by_lat_nheat[ff, :], label="", c=expcols[ff],ls='dotted')
+
+# for ff in range(nfilt):
+#     if ff == 0:
+#         lab = "No Filtering"
+#     else:
+#         lab = "LP Filter Cutoff %i-months" % (filts[ff])
+#     ax.plot(lat, corr_by_lat[ff, :], label=lab, c=expcols[ff])
+
+#     ax.plot(lat, rhocriteff[ff, :], ls='dashed', lw=.75, c=expcols[ff])
+    
+#     ax.plot(lat, corr_by_lat_nheat[ff, :], label="", c=expcols[ff],ls='dotted')
+    
+
+ax.set_xticks(xtks)
+if plot_lagvalue:
+    ax.set_ylabel("Lag (Months)")
+    
+    ax.set_title(
+        "Lag of Max $R^2$ between SPGNE SST and AMOC Maximum Transport @ each latitude")
+    
+else:
+    if calc_r2:
+        ax.set_ylabel("$R^2$")
+    else:
+        ax.set_ylabel("Correlation")
+    ax.set_title(
+        "Max $R^2$ between SPGNE SST and AMOC Maximum Transport @ each latitude")
+        
+ax.set_xlabel("Latitude")
+
+ax.axvline([52], c='magenta', ls='dotted')
+ax.axvline([62], c='magenta', ls='dotted')
+ax.axhline([0], c='k', ls='dotted', lw=0.5)
+ax.set_xlim([xtks[0],xtks[-1]])
+
+
+ax.legend()
+
+figname = "%sAMOC_SPGNE_NHEAT_R2_fit%s_bothfilt%i.png" % (figpath,str(filtin),both_filt)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% For each Latitude, Plot the Correlation
+
+for ii in range(2):
+    
+    if ii == 0:
+        plotvar = ((amoc_corrs)**2).T
+        iiname  = "AMOC"
+    else:
+        plotvar = ((nheat_corrs)**2).T
+        iiname  = "N_HEAT"
+
+    fig,ax = plt.subplots(1,1, constrained_layout=True, figsize=(12.5, 4))
+    
+    
+    pcm = ax.pcolormesh(lat,leadlags,plotvar,cmap='cmo.thermal',vmin=0,vmax=0.75)
+    
+    ax.scatter(lat, leadlags[(amoc_corrs[:,:]**2).argmax(1)], label="AMOC Transport " + lab, c='cyan')
+    ax.scatter(lat, leadlags[(nheat_corrs[:,:]**2).argmax(1)], label="N_HEAT " + lab, c='yellow',ls='dotted',marker="x")
+    ax.legend()
+    
+    
+    #fig.colorbar(pcm,ax=ax)
+    ax.set_xticks(xtks)
+    
+    ax.axvline([52], c='magenta', ls='dotted')
+    ax.axvline([62], c='magenta', ls='dotted')
+    ax.axhline([0], c='k', ls='dotted', lw=0.5)
+    ax.set_xlim([xtks[0],xtks[-1]])
+    figname = "%s%s_SPGNE_MaxLag_fit%s_bothfilt%i.png" % (figpath,iiname,str(filtin),both_filt)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+    
+        
+#%%
+ts1 = 
+ts2 = 
+
+
+#%%
+
+
+#calc_r2 = True
+calc_r2 = True
+filts   = [None, 5*12, 10*12, 20*12]
+nfilt   = len(filts)
+border  = 6
+
+ntime, nlat = amocidx.shape
+
+corr_by_lat       = np.zeros((nfilt, nlat))
+corr_by_lat_nheat = np.zeros((nfilt, nlat))
+
+dofeff = corr_by_lat.copy()
+
+for ff in range(nfilt):
+    filtin = filts[ff]
+
+    if filtin is None:
+        spgin = spgneid.data
+    else:
+        spgin = proc.lp_butter(spgneid.data, filtin, border)
+    
+    for a in range(nlat):
+        
+        corr_by_lat[ff, a]      = np.corrcoef(spgin, amocidx[:, a])[0, 1]
+        if calc_r2:
+            corr_by_lat[ff, a] = (corr_by_lat[ff, a])** 2 
+
+        
+        dofeff[ff, a]           = proc.calc_dof(spgin, ts1=amocidx[:, a])
+        
+        corr_by_lat_nheat[ff,a] = np.corrcoef(spgin, nheata.data[:, a])[0, 1]
+        if calc_r2:
+            corr_by_lat_nheat[ff,a] = (corr_by_lat_nheat[ff,a]) ** 2
+
+rhocrit    = proc.ttest_rho(0.05, 1, len(spgin))
+rhocriteff = proc.ttest_rho(0.05, 1, dofeff)
+
+
+#%% Edit Function
+
+
+
+def calc_lag_corr_1d(var1,var2,lags): # CAn make 2d by mirroring calc_lag_covar_annn
+    # Calculate the regression where
+    # (+) lags indicate var1 lags  var2 (var 2 leads)
+    # (-) lags indicate var1 leads var2 (var 1 leads)
+    
+    ntime = len(var1)
+    betalag = []
+    poslags = lags[lags >= 0]
+    for l,lag in enumerate(poslags):
+        varlag   = var1[lag:]
+        varbase  = var2[:(ntime-lag)]
+        
+        # Calculate correlation
+        beta = sp.stats.linregress(varbase,varlag)[2] # #np.polyfit(varbase,varlag,1)[0]   
+        betalag.append(beta.item())
+    
+    
+    neglags      = lags[lags < 0]
+    neglags_sort = np.sort(np.abs(neglags)) # Sort from least to greatest #.sort
+    betalead     = []
+    
+    
+    for l,lag in enumerate(neglags_sort):
+        varlag   = var2[lag:] # Now Varlag is the base...
+        varbase  = var1[:(ntime-lag)]
+        # Calculate correlation
+        #beta = np.polyfit(varlag,varbase,1)[0] 
+        beta = sp.stats.linregress(varlag,varbase)[2]
+        betalead.append(beta.item())
+    
+    
+    # Append Together
+    return np.concatenate([np.flip(np.array(betalead)),np.array(betalag)])
+
+
+
+#%% Given 2 Time series, Looping
+
+# Take the lag correlation across a set of lags (-12,12)
+
+
 
 # plotvar = output['regression_coeff']
 # mask    = output['sigmask']
