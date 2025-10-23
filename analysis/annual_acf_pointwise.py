@@ -31,8 +31,8 @@ import os
 # Autocorrelation parameters
 # --------------------------
 
-sel_mons        = [0,1,2] # Months to average over
-lags            = np.arange(0,61)
+sel_mons        = [1,2,3] # Months to average over (actual month)
+lags            = np.arange(0,41)
 lagname         = "lag%02ito%02i" % (lags[0],lags[-1]) 
 thresholds      = None#[-1,1] # Standard Deviations, Set to None if you don't want to apply thresholds
 thresholds_name = "ALL" # Manually name this
@@ -50,18 +50,33 @@ datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/da
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 hpf          = False
 
+mons1        = np.array(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'])#np.array(proc.get_monstr(nletters=1))
+monstr_out   = [mons1[m-1] for m in sel_mons]#mons1[sel_mons-1]
+monstr_out   = ''.join(monstr_out)
+
+# # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression>
+# # ---------------------------
+outname_data = "SM_SST_ORAS5_avg_GMSST_EOF_usevar_NATL"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression,EACH MONTH>
+# # ---------------------------
+outname_data = "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
-# # # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression>
-# # # ---------------------------
-# outname_data = "SM_SST_ORAS5_avg_GMSST_EOF_usevar_NATL"
-# vname_base   = "SST"
-# vname_lag    = "SST"
-# nc_base      = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
-# nc_lag       = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
-# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
 # Output Information
@@ -265,6 +280,26 @@ else:
     ds_base = ds_base[vname_base]
     ds_lag  = ds_lag[vname_lag]
 
+# ============================
+# %% Subset to selected months
+# ============================
+
+def selmon_ds(ds,selmon):
+    return ds.sel(time=ds.time.dt.month.isin(selmon))
+
+def annavg_ds(ds):
+    return ds.groupby('time.year').mean('time')
+
+ds_lag  = selmon_ds(ds_lag,sel_mons)
+ds_base = selmon_ds(ds_lag,sel_mons)
+
+ds_lag  = annavg_ds(ds_lag)
+ds_base = annavg_ds(ds_base)
+
+
+ds_lag  = ds_lag.rename(dict(year='time'))
+ds_base = ds_base.rename(dict(year='time'))
+
 # -------------------
 #%% Prepare for input
 # -------------------
@@ -326,8 +361,6 @@ Inputs are:
 ds_all = []
 for e in tqdm(range(nens)):
     
-    
-    
     # Remove NaN Points
     ensvars   = [invar[:,e,:] for invar in varsin] # npts x time
     nandicts  = [proc.find_nan(ensv,1,return_dict=True,verbose=False) for ensv in ensvars]
@@ -341,147 +374,47 @@ for e in tqdm(range(nens)):
         npts_valid = np.nan
         break
     
-    # Split to year and month
-    nyr        = int(ntime/12)
-    validdata  = [vd.reshape(npts_valid,nyr,12) for vd in validdata]
-    
     # Preallocate
-    class_count = np.zeros((npts_valid,12,nthres)) # [pt x eventmonth x threshold]
-    sst_acs     = np.zeros((npts_valid,12,nthres,nlags))  # [pt x eventmonth x threshold x lag]
-    #sst_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
+    #sst_acs     = np.zeros((npts_valid,nlags))  # [pt x eventmonth x threshold x lag]
     
-    for im in range(12):
-        
-        # For that month, determine which years fall into which thresholds [pts,years]
-        data_mon = [vd[:,:,im] for vd in validdata] # [pts x yr]
-        
-        if thresholds is None:
-            data_mon_classes = np.zeros(data_mon[0].shape) # Dummy Variable
-        else:
-            if thresvar:
-                print("WARNING NOT IMPLEMENTED. See Old Script...")
-            else:
-                data_mon_classes = proc.make_classes_nd(data_mon[0],thresholds,dim=1,debug=False) # Use the Base Variable
-        
-        for th in range(nthres): # Loop for each threshold
-            
-            if th < nthres - 1: # Calculate/Loop for all points 
-                
-                for pt in tqdm(range(npts_valid)): 
-                    
-                    # Get years which fulfill criteria
-                    yr_mask          = np.where(data_mon_classes[pt,:] == th)[0] # Indices of valid years
-                    if len(yr_mask) < 2:
-                        print("Only 1 point found for pt=%i, th=%i" % (pt,th))
-                        continue
-                    
-                    # Compute the lagcovariance (with detrending)
-                    datain_base      = validdata[0][pt,:,:].T # transpose to [month x year]
-                    datain_lag       = validdata[1][pt,:,:].T # transpose to [month x year]
-                    
-                    ac,yr_count      = proc.calc_lagcovar(datain_base,datain_lag,lags,im+1,0,yr_mask=yr_mask,debug=False)
-                    #cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
-                    
-                    # Save to larger variable
-                    class_count[pt,im,th] = yr_count
-                    sst_acs[pt,im,th,:]   = ac.copy()
-                    #sst_cfs[pt,im,th,:,:]  = cf.copy()
-                    # End Loop Point -----------------------------
-            
-            else: # Use all Data
-                #print("Now computing for all data on loop %i"%th)
-                # Reshape to [month x yr x npts]
-                datain_base    = validdata[0].transpose(2,1,0)
-                datain_lag     = validdata[1].transpose(2,1,0)
-                acs            = proc.calc_lagcovar_nd(datain_base,datain_lag,lags,im+1,0) # [lag, npts]
-                #cfs = proc.calc_conflag(acs,conf,tails,nyr) # [lag x conf x npts]
-                
-                # Save to larger variable
-                sst_acs[:,im,th,:] = acs.T.copy()
-                #sst_cfs[:,im,th,:,:]  = cfs.transpose(2,0,1).copy()
-                class_count[:,im,th]   = nyr
-            # End Loop Threshold -----------------------------
-        # End Loop Event Month -----------------------------
+    datain_base      = validdata[0][:,:] # space x time
+    datain_lag       = validdata[1][:,:] # space x time
+    covarout,winlen  = proc.calc_lag_covar_ann(datain_lag,datain_base,lags,1,0) # Needs [space x time]
     
     
-    #% Now Replace into original matrices
-    # Preallocate
     
-    count_final = np.zeros((npts,12,nthres)) * np.nan
-    acs_final   = np.zeros((npts,12,nthres,nlags)) * np.nan
-    #cfs_final   = np.zeros((npts,12,nthres+2,nlags,2)) * np.nan
-    
-    
-    # Replace
-    okpts_var                  = nandicts[0]['ok_indices'] # Basevar
-    count_final[okpts_var,...] = class_count
-    acs_final[okpts_var,...]   = sst_acs
-    #cfs_final[okpts,...]  = sst_cfs
-    
-    # Reshape
-    count_final = count_final.reshape(nlon,nlat,12,nthres)
-    acs_final   = acs_final.reshape(nlon,nlat,12,nthres,nlags)
-    
-    
-    # Get Threshold Labels
-    threslabs   = []
-    if thresholds is None:
-        threslabs.append("ALL")
-    else:
-        if nthres == 1:
-            threslabs.append("$T'$ <= %i"% thresholds[0])
-            threslabs.append("$T'$ > %i" % thresholds[0])
-        elif nthres == 4: # Positive, Neutral, Negative, All
-            for th in range(nthres-1):
-                if th == 0:
-                    tstr = "x < %s" % thresholds[th]
-                elif th == 1:
-                    tstr = "%s < x =< %s" % (thresholds[0],thresholds[1])
-                elif th == 2:
-                    tstr = "x > %s" % (thresholds[1])
-                threslabs.append(tstr)
-        else:
-            threslabs = [th for th in range(nthres-1)]
-        threslabs.append("ALL")
-    
-    # Make into Dataset
-    coords_count = {'lon':lon,
-                    'lat':lat,
-                    'mons':np.arange(1,13,1),
-                    'thres':threslabs}
-    
+    acs_final                   = np.zeros((npts,nlags)) * np.nan
+    okpts_var                   = nandicts[0]['ok_indices'] # Basevar
+    acs_final[okpts_var,...]    = covarout.T
+    acs_final   = acs_final.reshape(nlon,nlat,nlags)
+
     coords_acf  = {'lon'    :lon,
                     'lat'   :lat,
-                    'mons'  :np.arange(1,13,1),
-                    'thres' :threslabs,
                     'lags'  :lags}
     
-    da_count   = xr.DataArray(count_final,coords=coords_count,dims=coords_count,name="class_count")
     da_acf     = xr.DataArray(acs_final,coords=coords_acf,dims=coords_acf,name="acf")
-    ds_out     = xr.merge([da_count,da_acf])
-    encodedict = proc.make_encoding_dict(ds_out)
+    encodedict = proc.make_encoding_dict(da_acf)
+    ds_out = da_acf
     
     # Save Output
     if saveens_sep:
-        savename = "%s%s_%s_%s_ens%02i.nc" % (outpath,outname_data,lagname,thresholds_name,e+1)
+        savename = "%s%s_%s_%s_ens%02i.nc" % (outpath,outname_data,lagname,monstr_out,e+1)
         ds_out.to_netcdf(savename,encoding=encodedict)
     ds_all.append(ds_out)
 
 #%% Run this final point to merge this output
 
 if saveens_sep:
-    
     # Load everything again JTBS
     ds_all = []
     for e in range(nens):
-        savename = "%s%s_%s_%s_ens%02i.nc" % (outpath,outname_data,lagname,thresholds_name,e+1)
-        
+        savename = "%s%s_%s_%s_ens%02i.nc" % (outpath,outname_data,lagname,monstr_out,e+1)
         ds = xr.open_dataset(savename).load()
         ds_all.append(ds)
 
 ds_all       = xr.concat(ds_all,dim='ens')
 outpath      = procpath#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
+savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,monstr_out)
 ds_all.to_netcdf(savename_out,encoding=encodedict)
 
 print("Output saved to %s in %.2fs" % (savename_out,time.time()-st))
