@@ -89,7 +89,6 @@ nc_adt          = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
 ds_adt          = xr.open_dataset(nc_adt).load()
 cints_adt       = np.arange(-100, 110, 10)
 
-
 # Make a plotting function
 def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
     # Requires ds_masks and ds_adt to be loaded
@@ -234,11 +233,12 @@ expls           = ["dashed","dotted",'solid']
 
 # (9) Forcing EOF vs Std Comparison
 comparename     = "ForcingComparison"
-expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_EOF","SST_ERA5_1979_2024"]
-expnames_long   = ["stdev(F') Forcing","EOF-based Forcing","ERA5"]
-expnames_short  = ["Fstd","EOF","ERA5"]
-expcols         = ["hotpink","navy","k"]
-expls           = ["dotted","dashed",'solid']
+expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_EOF","SST_ORAS5_avg_GMSSTmon_EOF","SST_ERA5_1979_2024"]
+expnames_long   = ["stdev(F') Forcing","EOF-based Forcing","EOF-based Forcing with GMSSTmon Detrend","ERA5"]
+expnames_short  = ["Fstd","EOF","EOF_GMSSTmon","ERA5"]
+expcols         = ["hotpink","navy","cornflowerblue","k"]
+expls           = ["dotted","dashed","dashed",'solid']
+detect_blowup   = True
 
 # (10) Linear Detrend (All Month) vs GMSST Removal (Sep Month)
 comparename     = "DetrendingEffect"
@@ -248,6 +248,27 @@ expnames_short  = ["LinearDetrend","GMSST","GMSSTmon","ERA5"]
 expcols         = ["hotpink","cornflowerblue","navy","k"]
 expls           = ["dotted",'solid',"dashed",'solid']
 detect_blowup   = True
+
+
+# # (11) Forcing Repair
+# comparename     = "ForcingComparison"
+# expnames        = ["SST_ORAS5_avg","SST_ORAS5_avg_GMSSTmon_EOF","SST_ORAS5_avg_GMSSTmon_EOF_usevar","SST_ERA5_1979_2024"]
+# expnames_long   = ["stdev(F') Forcing","EOF-based Forcing","EOF-based Forcing (corrected)","ERA5"]
+# expnames_short  = ["Fstd","EOF","EOF_corrected","ERA5"]
+# expcols         = ["hotpink","navy","cornflowerblue","k"]
+# expls           = ["dotted","dashed","dashed",'solid']
+# detect_blowup   = True
+
+
+# (12) Draft 2 Edition (using case with GMSST Mon Detrend)
+comparename     = "Draft02"
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_SPGNE","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (No re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
+expnames_short  = ["SM","SM_REM","ERA5"]
+expcols         = ["goldenrod","turquoise","k"]
+expls           = ["dashed","dotted",'solid']
+detect_blowup   = True
+
 
 
 #%% Load information for each region
@@ -263,44 +284,44 @@ for ex in tqdm.tqdm(range(nexps)):
     
 #%% Temp Fix, remove chunks where the model blows up...
 
-# def detect_blowup(ds,vname,chunk,thres):
-#     ntime = ds[vname].shape[0]
-#     niter = int(ntime/chunk)
+def detect_blowup(ds,vname,chunk,thres):
+    ntime = ds[vname].shape[0]
+    niter = int(ntime/chunk)
     
-#     for ii in range(niter):
+    for ii in range(niter):
         
-#         # Get Chunk
-#         id0 = ii*chunk
-#         id1 = (ii+1) * chunk
+        # Get Chunk
+        id0 = ii*chunk
+        id1 = (ii+1) * chunk
         
-#         #ids = np.arange(ii*chunk,(ii+1)*chunk)
-#         dschunk = ds[vname].isel(time=slice(id0,id1))
+        #ids = np.arange(ii*chunk,(ii+1)*chunk)
+        dschunk = ds[vname].isel(time=slice(id0,id1))
         
-#         if np.any(np.abs(dschunk) > thres):
+        if np.any(np.abs(dschunk) > thres):
             
-#             print("Exceeded threshold in chunk %i to %i" % (id0,id1))
-#             dsbefore = ds.isel(time=slice(None,id0))
-#             dsafter  = ds.isel(time=slice(id1,None))
-#             ds = xr.concat([dsbefore,dsafter],dim='time')
+            print("Exceeded threshold in chunk %i to %i" % (id0,id1))
+            dsbefore = ds.isel(time=slice(None,id0))
+            dsafter  = ds.isel(time=slice(id1,None))
+            ds = xr.concat([dsbefore,dsafter],dim='time')
 
-#     return ds
+    return ds
 
 if detect_blowup:
-    dsall = [proc.detect_blowup(ds,'SST',12000,10) for ds in dsall]
+    dsall = [detect_blowup(ds,'SST',12000,10) for ds in dsall]
     
 
     
-#%% Preprocessing
+#%% Preprocessing (Deseason Only)
 
 dsa      = [proc.xrdeseason(ds) for ds in dsall]
-ssts     = [sp.signal.detrend(ds.SST.data) for ds in dsa]
-ssts_ds  = [proc.xrdetrend(ds.SST) for ds in dsa]
+ssts     = [sp.signal.detrend(ds.SST.data) for ds in dsa] # Detrend for Stochastic Model
+ssts_ds  = [proc.xrdetrend(ds.SST) for ds in dsa] # Detrend for Stochastic Model
 
 #%% Detrend ERA5 using Global Mean Regression Approach
 if (detrend_obs_regression):
     
     # 
-    sst_era = dsa[-1].SST
+    sst_era = dsa[-1].SST # Take undetrended ERA5 SST
     sst_era = sst_era.expand_dims(dim=dict(lon=1,lat=1))
     
     # Add dummy lat lon
@@ -314,7 +335,7 @@ if (detrend_obs_regression):
     sst_era_dt = dsdtera5.SST.squeeze()
     
     ssts_ds[-1] = sst_era_dt
-    ssts[-1] = sst_era_dt.data
+    ssts[-1]    = sst_era_dt.data
     #print("\nSkipping ERA5, loading separately")
     
 #%% Compute basic metrics
@@ -492,6 +513,7 @@ for ex in range(nexps):
 remove_topright = True
 expcols_bar     = np.array(expcols).copy()
 expcols_bar[-1] = 'gray'
+
 label_vratio    = False
 
 fsz_axis        = 18
@@ -558,6 +580,27 @@ savename = "%sMonvar_%s.png" % (figpath,comparename)
 if darkmode:
     figname = proc.addstrtoext(figname,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+
+
+#%% Plot the monthly variance as a percentage
+
+ex      = 1
+pct_exp = (metrics_out['monvars'][ex] / metrics_out['monvars'][-1])*100
+
+fig,ax  = viz.init_monplot(1,1,figsize=(8,4.5))
+bbar    = ax.bar(mons3,pct_exp,color=expcols[ex])
+ax.bar_label(bbar,fmt="%.01f",c=dfcol,fontsize=12)
+
+ax.set_xlim([-1,12])
+ax.set_ylim([0,100])
+ax.set_title("Percent Variance Explained by %s" % (expnames_long[ex]))
+
+savename = "%sPercent_Variance_ERA5_Explained_by_%s_%s.png" % (figpath,expnames[ex],comparename)
+
+if darkmode:
+    figname = proc.addstrtoext(figname,"_darkmode")
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+
 
 # ====================================================
 #%% Plot ACF for Winter and Summer (For Paper Outline)
@@ -756,3 +799,12 @@ figname = "%sVariance_%s_PaperOutline.png" % (figpath,comparename)
 if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight')
+
+
+#%% Compare Monthly Averages
+
+
+
+
+#%% Look at correlation with northward heat transport
+
