@@ -29,6 +29,8 @@ import os
 import tqdm
 import time
 
+import cmcrameri.cm as cm
+
 #%% Load custom modules
 
 # local device (currently set to run on Astraeus, customize later)
@@ -89,7 +91,6 @@ nc_adt          = dpath_aviso + "AVISO_adt_NAtl_1993_2022_clim.nc"
 ds_adt          = xr.open_dataset(nc_adt).load()
 cints_adt       = np.arange(-100, 110, 10)
 
-
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
@@ -108,6 +109,14 @@ expnames        = ["SST_Obs_Pilot_00_Tdcorr0_qnet","SST_ERA5_1979_2024"]
 expnames_long   = ["Stochastic Model (with Re-emergence)","ERA5 Reanalysis (1979-2024)"]
 expcols         = ["turquoise","k"]
 expls           = ["dotted",'solid']
+
+# Indicate Experiment and Comparison Name 
+comparename     = "smio202510"
+expnames        = ["SST_ORAS5_avg_GMSST_EOF_usevar_NATL","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (with Re-emergence)","ERA5 Reanalysis (1979-2024)"]
+expcols         = ["turquoise","k"]
+expls           = ["dotted",'solid']
+
 
 # #
 # comparename     = "IncludeInsig"
@@ -462,6 +471,48 @@ if darkmode:
     figname = proc.addstrtoext(figname,"_dark")
 plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
+#%% Updated plots for SMIO Results
+
+plt.style.use('default')
+kmonths         = [1,2]#np.arange(0,12,1)#[0,1,2]
+
+cmap            = cm.acton_r
+
+cints           = np.arange(0,36,3)
+cints_t2_major  = np.arange(0,48,6)
+
+centlat         = 50
+bbsel           = [-80, -0, 40, 65] # [-40, -12, 50, 62]
+fig,axs,_       = viz.init_orthomap(1,2,bbsel,figsize=(20,12),centlat=centlat)
+
+for a,ax in enumerate(axs):
+    ii = a
+    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='dimgray',
+                                        fill_color="lightgray",fontsize=fsz_tick)
+    
+    
+    # Plot the t2
+    plotvar = t2s[ii].isel(mon=kmonths).mean('mon').T2.T #* apply_mask
+    if pmesh:
+        cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                              vmin=cints[0],vmax=cints[-1],
+                              transform=proj,cmap=cmap,zorder=-1)
+        
+        
+        cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                              levels=cints_t2_major,
+                              transform=proj,colors='w',zorder=-1)
+        ax.clabel(cl,fontsize=fsz_ticks+6)
+        
+    else:
+        cf      = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+                              levels=cints,
+                              transform=proj,cmap=cmap,zorder=-1)
+        
+cb = viz.hcbar(cf,ax=axs.flatten(),fontsize=22,pad=0.0001,fraction=0.045)
+cb.set_label("Decorrelation Timescale $T^2$ [Months]",fontsize=fsz_axis)  
+
+
 
 
 #%% Scrap Below
@@ -549,7 +600,7 @@ for ii in range(2):
             ax.clabel(cl,fontsize=fsz_ticks-2)
             
 
-#%%
+#%% 
 
 
 
