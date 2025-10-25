@@ -65,7 +65,7 @@ dsst = xr.open_dataset(sstpath+sstnc).load()
 proc.printtime(st, print_str="loaded in")
 
 # Declare Figure Path
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20251006/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20251106/"
 proc.makedir(figpath)
 
 # Load N_HEAT
@@ -129,6 +129,74 @@ def pointwise_coherence(ts1, ts2, opt=1, nsmooth=100, pct=0.10, return_ds=False)
             return ds_out
         return coherence_sq
 
+
+# New Function to calculate coherence and its significance
+def calc_sig_coherence(alpha, dof, coh_sq=True, approx=False):
+    """
+    Source: https://dsp.stackexchange.com/questions/16558/statistical-significance-of-coherence-values
+
+    Method (1): Coherence (coh_sq=False,approx=False)
+
+        L1(a,q)        = 1 - alpha^(1/q)
+
+    Method (2): Magnitude-Squared Coherence (coh_sq=True,approx=False)
+
+        L2(a,q)        = F_(2,2q)(alpha) / (F_(2,2q)(alpha) + q)
+
+    Method (3): Wunsch Approximation? (approx=True)
+
+        L3(alpha=0.05) = 6/DOF (as q --> inf)
+
+    """
+    p = 1 - alpha
+    n = dof/2  # Why?
+    if approx:
+        return 6/dof
+    else:
+        if coh_sq:
+            fval = sp.stats.f.ppf(p, 2, dof-2)
+            L2 = fval / (n - 1 + fval)
+            return L2
+        else:
+            L1 = 1 - alpha**(1 / (n-1))
+            return L1
+    return None
+
+# Calculate Lead Lag Correlation 
+def calc_lag_corr_1d(var1,var2,lags): # Can make 2d by mirroring calc_lag_covar_annn
+    # Calculate the regression where
+    # (+) lags indicate var1 lags  var2 (var 2 leads)
+    # (-) lags indicate var1 leads var2 (var 1 leads)
+    
+    ntime = len(var1)
+    betalag = []
+    poslags = lags[lags >= 0]
+    for l,lag in enumerate(poslags):
+        varlag   = var1[lag:]
+        varbase  = var2[:(ntime-lag)]
+        
+        # Calculate correlation
+        beta = sp.stats.linregress(varbase,varlag)[2] # #np.polyfit(varbase,varlag,1)[0]   
+        betalag.append(beta.item())
+    
+    
+    neglags      = lags[lags < 0]
+    neglags_sort = np.sort(np.abs(neglags)) # Sort from least to greatest #.sort
+    betalead     = []
+    
+    
+    for l,lag in enumerate(neglags_sort):
+        varlag   = var2[lag:] # Now Varlag is the base...
+        varbase  = var1[:(ntime-lag)]
+        # Calculate correlation
+        #beta = np.polyfit(varlag,varbase,1)[0] 
+        beta = sp.stats.linregress(varlag,varbase)[2]
+        betalead.append(beta.item())
+    
+    
+    # Append Together
+    return np.concatenate([np.flip(np.array(betalead)),np.array(betalag)])
+
 # %% Preprocess
 
 # Transport Components
@@ -140,14 +208,13 @@ icomp   = 0
 moca    = preprocess_ds(dsmoc.isel(moc_comp=icomp).MOC)
 ssta    = preprocess_ds(dsst.TS)
 
-
 nheata  = preprocess_ds(dsnheat.N_HEAT)
 
 # %% Calculate AMOC Index by latitude (max depth)
 
 # Basically taking the absolute maximum, keeping the sign... (prob smarter way to do this)
 mocmax = moca.max('moc_z')
-mocmin = moca.min('moc_z')
+mocmin  = moca.min('moc_z')
 amocidx = xr.where(np.abs(mocmax) > np.abs(mocmin),mocmax,mocmin)
 
 
@@ -163,7 +230,11 @@ sstreg      = proc.sel_region_xr(ssta, bbox_spgne)
 spgneid     = proc.area_avg_cosweight(sstreg)
 
 
-# %% Calculate Correlation
+# =================================================
+#%% 1. Testing effect of filter size on correlation
+# =================================================
+
+# % Calculate Correlation/R2 for different filters
 
 #calc_r2 = True
 calc_r2 = True
@@ -202,7 +273,7 @@ for ff in range(nfilt):
 rhocrit    = proc.ttest_rho(0.05, 1, len(spgin))
 rhocriteff = proc.ttest_rho(0.05, 1, dofeff)
 
-# %% Plot Correlation vs Latitude
+# %% Plot Correlation vs Latitude, effect of filter size
 
 expcols = ["k", "magenta", "blue", "green"]
 
@@ -243,7 +314,10 @@ ax.set_title(
 ax.legend()
 
 
-# %% Look at the patterns of MOC transport associated with each case
+# =================================================================
+#%% Part (2) Calculate Regression Coefficients with MOC transport
+# =================================================================
+# % Look at the patterns of MOC transport associated with each case
 
 pats = []
 sigs = []
@@ -267,7 +341,6 @@ for ff in tqdm.tqdm(range(nfilt)):
 
 
 # %% Plot the patterns
-
 
 levels = np.arange(-30, 32, 2)
 
@@ -318,9 +391,9 @@ for ff in range(nfilt):
     figname = "%sAMOC_SPGNE_Regression_fit%s.png" % (figpath,str(filts[ff]))
     plt.savefig(figname,dpi=150,bbox_inches='tight')
 
-# =========================================================
-# %% Try to calculate coherence looping across all latitudes
-# =========================================================
+# ==================================================================
+# %% Part 3: Try to calculate coherence looping across all latitudes
+# ==================================================================
 
 # Indicate Smoothing and filter preferences
 nsmooth = 250
@@ -328,9 +401,6 @@ nsmooth = 250
 # Select Filtering
 filt    = None#10*12  # 20*12#None
 filtstr = str(filt)
-
-
-
 
 chsq = []
 for a in tqdm.tqdm(range(nlat)):
@@ -405,19 +475,16 @@ figname = "%sCoherenceSq_SPGNE_AMOC_Meridional_filt%s.png" % (
 
 plt.savefig(figname, dpi=150, bbox_inches='tight')
 
-
-
 # %% Plot coherence at a given latitude along with the power spectra
 latf =  36.5
 
 # % Other PLotting Things
-dtmon_fix = 60*60*24*30
-xper = np.array([40, 10, 5, 1, 0.5])
-xper_ticks = 1 / (xper*12)
+dtmon_fix   = 60*60*24*30
+xper        = np.array([40, 10, 5, 1, 0.5])
+xper_ticks  = 1 / (xper*12)
 
 
-fig, axs = plt.subplots(3, 1, constrained_layout=True, sharex=True,figsize=(10,8))
-
+fig, axs    = plt.subplots(3, 1, constrained_layout=True, sharex=True,figsize=(10,8))
 for ii in range(3):
 
     ax = axs[ii]
@@ -453,44 +520,9 @@ for ii in range(3):
     #ax2.set_xlabel("Period (Years)", fontsize=14)
 
     # ----
-# chsq2.coherence_sq.plot()
-
-# %% Try a new function to compute coherence
-# Values appear to be too low (maybe due to the large DOF values)
-
-def calc_sig_coherence(alpha, dof, coh_sq=True, approx=False):
-    """
-    Source: https://dsp.stackexchange.com/questions/16558/statistical-significance-of-coherence-values
-
-    Method (1): Coherence (coh_sq=False,approx=False)
-
-        L1(a,q)        = 1 - alpha^(1/q)
-
-    Method (2): Magnitude-Squared Coherence (coh_sq=True,approx=False)
-
-        L2(a,q)        = F_(2,2q)(alpha) / (F_(2,2q)(alpha) + q)
-
-    Method (3): Wunsch Approximation? (approx=True)
-
-        L3(alpha=0.05) = 6/DOF (as q --> inf)
-
-    """
-    p = 1 - alpha
-    n = dof/2  # Why?
-    if approx:
-        return 6/dof
-    else:
-        if coh_sq:
-            fval = sp.stats.f.ppf(p, 2, dof-2)
-            L2 = fval / (n - 1 + fval)
-            return L2
-        else:
-            L1 = 1 - alpha**(1 / (n-1))
-            return L1
-    return None
 
 # ======================================================
-# %% Select a point and examine coherence + significance
+# %% Part 4 Select a point and examine coherence + significance
 # ======================================================
 
 
@@ -530,14 +562,11 @@ L3 = calc_sig_coherence(0.05, dofeff, approx=True)
 # note that the white noise generated still does not match the original timeseries
 # need to troubleshoot this and look at how others estimate the noise term
 
-
 def calcsig_both(ts1, ts2):
     return np.std(ts1), np.std(ts2)
 
-
 mciter = 1000
 def csig(x, y): return calcsig_both(x, y)
-
 
 def ccoh(x, y): return pointwise_coherence(
     x, y, opt=1, nsmooth=nsmooth, pct=0.10, return_ds=True).coherence_sq.data
@@ -614,16 +643,10 @@ figname = "%sCoherenceSq_SPGNE_AMOC%02i_filt%s_mciter%i.png" % (
 
 plt.savefig(figname, dpi=150, bbox_inches='tight')
 
-# %% Visualize some basic features
 
-
-fig,axs = plt.subplots(2,1)
-
-ax1,ax2 = axs
-
-proc.xrdeseason(amocidx.sel(lat_aux_grid=26,method='nearest')).plot(ax=ax1)
-
-#%% Do simple covariance calculations
+# ==================================================
+#%% Part 5) Do simple covariance calculations
+# ==================================================
 
 filt=None
 
@@ -674,20 +697,13 @@ ax.axvline([52],c="magenta",ls='dashed',lw=0.75)
 
 ax.set_xticks(xtks)
 
-#%%
-    
-
-
-np.cov(ts1,ts2)
-
-
-#%% Try to compute R2 for different lags
-
+# ==================================================
+#%% Part 6: Try to compute R2 for different lags
+# ==================================================
 both_filt = True
 filtin   = 10*12
 border   = 6
-leadlags = np.arange(-60,61,1)
-
+leadlags = np.arange(-240,244,4)
 
 # abyfilt = []
 # nbyfilt = []
@@ -735,18 +751,11 @@ for a in tqdm.tqdm(range(nlat)):
 # nbyfilt = np.array(nbyfilt)
         
 # #% Save the Output
-
-
 # coords = dict(filt=filts,lat=lat,lag=leadlags)
-
 # daout_amoc  = xr.DataArray(abyfilt,coords=coords,dims=coords,name='amoc')
 # daout_nheat = xr.DataArray(nbyfilt,coords=coords,dims=coords,name='n_heat')
 
-
-
-    
-    
-#%% Try to Plot the Output
+#%% Plot the Maximum R2 by Latitude
 
 calc_r2    = True
 plot_lag0  = False
@@ -778,32 +787,10 @@ else:
     else:
         ax.plot(lat, (amoc_corrs[:,:]**2).max(1), label="AMOC Transport " + lab, c='midnightblue')
         ax.plot(lat, (nheat_corrs[:,:]**2).max(1), label="N_HEAT " + lab, c='salmon',ls='dotted')
-        
-    # Also Plot index of maximum Lag
-    # ax2 = ax.twinx()
-    # ax2.scatter(lat, leadlags[(amoc_corrs[:,:]**2).argmax(1)], label="AMOC Transport " + lab, c='midnightblue')
-    # ax2.scatter(lat, leadlags[(nheat_corrs[:,:]**2).argmax(1)], label="N_HEAT " + lab, c='salmon',ls='dotted')
-    
-#ax.plot(lat, corr_by_lat[ff, :], label="Original", c="k",ls='dashed')
+
+
 print("Max Lat for AMOC R2 is %.2f" % (lat[(amoc_corrs[:,:]**2).max(1).argmax()].item()))
 print("Max Lat for N_HEAT R2 is %.2f" % (lat[(nheat_corrs[:,:]**2).max(1).argmax()].item()))
-
-
-
-#a#x.plot(lat, rhocriteff[ff, :], ls='dashed', lw=.75, c=expcols[ff])
-#ax.plot(lat, corr_by_lat_nheat[ff, :], label="", c=expcols[ff],ls='dotted')
-
-# for ff in range(nfilt):
-#     if ff == 0:
-#         lab = "No Filtering"
-#     else:
-#         lab = "LP Filter Cutoff %i-months" % (filts[ff])
-#     ax.plot(lat, corr_by_lat[ff, :], label=lab, c=expcols[ff])
-
-#     ax.plot(lat, rhocriteff[ff, :], ls='dashed', lw=.75, c=expcols[ff])
-    
-#     ax.plot(lat, corr_by_lat_nheat[ff, :], label="", c=expcols[ff],ls='dotted')
-    
 
 ax.set_xticks(xtks)
 if plot_lagvalue:
@@ -833,7 +820,8 @@ ax.legend()
 figname = "%sAMOC_SPGNE_NHEAT_R2_fit%s_bothfilt%i.png" % (figpath,str(filtin),both_filt)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
-#%% For each Latitude, Plot the Correlation
+#%% Plot the Lag vs. Latitude R2 Values
+# Also include the line indicating lag where maximum R2 occurs
 
 for ii in range(2):
     
@@ -863,12 +851,6 @@ for ii in range(2):
     ax.set_xlim([xtks[0],xtks[-1]])
     figname = "%s%s_SPGNE_MaxLag_fit%s_bothfilt%i.png" % (figpath,iiname,str(filtin),both_filt)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
-
-    
-        
-#%%
-ts1 = 
-ts2 = 
 
 
 #%%
@@ -912,43 +894,186 @@ rhocrit    = proc.ttest_rho(0.05, 1, len(spgin))
 rhocriteff = proc.ttest_rho(0.05, 1, dofeff)
 
 
-#%% Edit Function
+# =============================================================
+#%% 2025.10.17 Update: Calculate R2 lead/lag using annual data
+# =============================================================
+
+# Take Annual Average of each quantity
+def annavg_ds(ds):
+    return ds.groupby('time.year').mean('time')
+
+spgneid_ann     = annavg_ds(spgneid)
+#amocidxa        = amocidx.groupby('time.month') - amocidx.groupby('time.month').mean('time')
+amocidx_ann     = annavg_ds(amocidx)
+nheata_ann      = annavg_ds(nheata)
+
+#amocidx_ann_rs  = moca.max('moc_z').resample()
+
+#%% Redo lag R2 calculations with the annual average (copied from monthly case above)
+leadlags_ann = np.arange(-20,21,1)
+
+
+filtin       = 10
+both_filt    = True
+border       = 6
+
+_,nlat = amocidx_ann.shape
+
+if filtin is None:
+    spgin = spgneid_ann.data
+else:
+    spgin = proc.lp_butter(spgneid_ann.data, filtin, border)
+
+nleadlags        = len(leadlags_ann)
+amoc_corrs_ann  = np.zeros((nlat,nleadlags))
+nheat_corrs_ann = amoc_corrs_ann.copy()
+
+for a in tqdm.tqdm(range(nlat)):
+    
+    amocin    = amocidx_ann[:, a].data
+    nheatin   = nheata_ann[:, a].data
+    
+    # Note: Doesnt make sense to deseason as already annual data
+    #amocin    = proc.xrdeseason(amocidx_ann[:,a]).data
+    #nheatin   = proc.xrdeseason(nheata_ann[:,a].data)
+    
+    if both_filt and filtin is not None:
+        amocin  = proc.lp_butter(amocin, filtin, border)
+        nheatin = proc.lp_butter(nheatin, filtin, border)
+    
+    amoclags  = calc_lag_corr_1d(amocin,spgin,leadlags_ann)
+    nheatlags = calc_lag_corr_1d(nheatin,spgin,leadlags_ann)
+    
+    amoc_corrs_ann[a,:]     = amoclags.copy()
+    nheat_corrs_ann[a,:]    = nheatlags.copy()
 
 
 
-def calc_lag_corr_1d(var1,var2,lags): # CAn make 2d by mirroring calc_lag_covar_annn
-    # Calculate the regression where
-    # (+) lags indicate var1 lags  var2 (var 2 leads)
-    # (-) lags indicate var1 leads var2 (var 1 leads)
+#%% Plot the Annual-Average R^2 Value
+# (Lag vs Latitude, All Lags)
+
+if filtin is None:
+    lab = "No Filtering"
+else:
+    lab = "LP Filter Cutoff %i-months" % (filtin)
+
+xtks    = np.arange(0, 95, 5)
+msz     = 5
+lat = nheata_ann.lat_aux_grid
+for ii in range(2):
     
-    ntime = len(var1)
-    betalag = []
-    poslags = lags[lags >= 0]
-    for l,lag in enumerate(poslags):
-        varlag   = var1[lag:]
-        varbase  = var2[:(ntime-lag)]
-        
-        # Calculate correlation
-        beta = sp.stats.linregress(varbase,varlag)[2] # #np.polyfit(varbase,varlag,1)[0]   
-        betalag.append(beta.item())
-    
-    
-    neglags      = lags[lags < 0]
-    neglags_sort = np.sort(np.abs(neglags)) # Sort from least to greatest #.sort
-    betalead     = []
-    
-    
-    for l,lag in enumerate(neglags_sort):
-        varlag   = var2[lag:] # Now Varlag is the base...
-        varbase  = var1[:(ntime-lag)]
-        # Calculate correlation
-        #beta = np.polyfit(varlag,varbase,1)[0] 
-        beta = sp.stats.linregress(varlag,varbase)[2]
-        betalead.append(beta.item())
+    if ii == 0:
+        plotvar = ((amoc_corrs_ann)**2).T
+        iiname  = "AMOC"
+    else:
+        plotvar = ((nheat_corrs_ann)**2).T
+        iiname  = "N_HEAT"
+
+    fig,ax = plt.subplots(1,1, constrained_layout=True, figsize=(12.5, 4))
     
     
-    # Append Together
-    return np.concatenate([np.flip(np.array(betalead)),np.array(betalag)])
+    pcm = ax.pcolormesh(lat,leadlags_ann,plotvar,cmap='cmo.thermal',vmin=0,vmax=0.75)
+    
+    ax.scatter(lat, leadlags_ann[(amoc_corrs_ann[:,:]**2).argmax(1)], label="AMOC Transport " + lab, c='cyan',s=msz)
+    ax.scatter(lat, leadlags_ann[(nheat_corrs_ann[:,:]**2).argmax(1)], label="N_HEAT " + lab, c='yellow',ls='dotted',marker="x",s=msz)
+    ax.legend()
+    
+    fig.colorbar(pcm,ax=ax)
+    ax.set_xticks(xtks)
+    
+    ax.axvline([52], c='magenta', ls='dotted')
+    ax.axvline([62], c='magenta', ls='dotted')
+    ax.axhline([0], c='k', ls='dotted', lw=0.5)
+    
+    ax.set_ylabel("Lag (Years)")
+    ax.set_xlabel("Latitude ($\degree N$)")
+    
+    ax.set_xlim([xtks[0],xtks[-1]])
+    figname = "%s%s_SPGNE_Ann_MaxLag_fit%s_bothfilt%i.png" % (figpath,iiname,str(filtin),both_filt)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+    
+#%% Max Lag vs. Latitude (compare with monthly)
+
+lww     = 2.5
+fig,ax  = plt.subplots(1, 1, constrained_layout=True, figsize=(12.5, 4))
+
+maxlat = lambda ds: lat[ds.argmax()].data
+
+# AMOC ----
+
+# Plot Annual Average Maximum by Lat
+plotvar = amoc_corrs_ann.max(1)**2
+mlat    = maxlat(plotvar)
+maxval    = np.nanmax(plotvar)
+ax.plot(lat,plotvar,label="MOC Transport (Ann-Avg), max=%.1f%% @ $%.2f \degree N$" % (maxval*100,mlat),color='midnightblue',lw=lww)
+ax.axvline([mlat],c='midnightblue')
+
+# Plot Monthly Maximum by Lat
+plotvar = amoc_corrs.max(1)**2
+mlat    = maxlat(plotvar)
+maxval    = np.nanmax(plotvar)
+ax.plot(lat,plotvar,label="MOC Transport (Monthly), max=%.1f%% @ $%.2f \degree N$" % (maxval*100,mlat),color='midnightblue',ls='dashed',lw=lww)
+ax.axvline([mlat],c='midnightblue',ls='dashed')
+
+# N_HEAT ---
+plotvar = nheat_corrs_ann.max(1)**2
+mlat    = maxlat(plotvar)
+maxval  = np.nanmax(plotvar)
+ax.plot(lat,plotvar,label="N_HEAT Transport (Ann-Avg), max=%.1f%% @ $%.2f \degree N$" % (maxval*100,mlat),color='salmon',lw=lww)
+ax.axvline([mlat],c='salmon')
+
+plotvar = nheat_corrs.max(1)**2
+mlat    = maxlat(plotvar)
+maxval  = np.nanmax(plotvar)
+ax.plot(lat,plotvar,label="N_HEAT Transport (Monthly), max=%.1f%% @ $%.2f \degree N$" % (maxval*100,mlat),color='salmon',ls='dashed',lw=lww)
+ax.axvline([mlat],c='salmon',ls='dashed')
+
+ax.legend(ncol=2,fontsize=12)
+
+ax.set_ylim([-0.25,1.25])
+ax.set_ylabel("$R^2$",fontsize=14)
+ax.set_xlabel("Latitude",fontsize=14)
+ax.axvline([52], c='magenta', ls='dotted')
+ax.axvline([62], c='magenta', ls='dotted')
+ax.axhline([0], c='k', ls='dotted', lw=0.5)
+ax.axhline([1], c='k', ls='dotted', lw=0.5)
+ax.set_xlim([xtks[0],xtks[-1]])
+ax.set_title("Maximum $R^2$ By Latitude (%s)" % lab)
+ax.tick_params(labelsize=14)
+
+figname = "%s%s_SPGNE_LagvLat_AnnComparison_fit%s_bothfilt%i.png" % (figpath,iiname,str(filtin),both_filt)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% Double Check Annual Averaging
+
+plotx  = np.arange(len(amocidx.time))
+a = 44
+
+fig,ax = plt.subplots(1,1,constrained_layout=True)
+
+plotvar = amocidx.isel(lat_aux_grid=a)
+ax.plot(plotx,plotvar,label="Monthly")
+
+plotvar = amocidx_ann.isel(lat_aux_grid=a)
+ax.plot(plotx[6::12],plotvar,label="Annual")
+
+ax.set_xlim([0,120])
+ax.legend()
+
+#%% Check if there are any residual cycles
+
+def scycle(ds):
+    return ds.groupby('time.month').mean('time')
+
+#moc_sc      = scycle(amocidx)
+
+
+
+#nh_sc       = scycle(nheata)
+
+
 
 
 
