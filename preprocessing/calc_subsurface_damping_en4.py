@@ -52,7 +52,6 @@ import scm
 import amv.loaders as dl
 import cvd_utils as cvd
 
-
 #%% Helper Functions
 
 # Functions ---
@@ -179,10 +178,12 @@ elif dataset_name == "ORAS5_avg" or "ORAS5_avg_mld03":
         mimocnc   = "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
         ds_mld    = xr.open_dataset(mimocpath + mimocnc).load()
     
+    
     # Set Cropping Time Period
     tstart = 1979
     tend   = 2024
-    bbcalc = [-40,-15,52,62]
+    bbcalc = [-80,0,0,65]
+   # bbcalc = [-40,-15,52,62]
     
     ds_temp = ds_temp.rename(dict(z_t='depth'))
     
@@ -215,7 +216,7 @@ nlags   = len(lags)
 lagmax  = 3
 
 # detrend = 'ensmean'
-detrend = "GMSST" #'gmsst' # Set to None to do a linear detrend
+detrend = "GMSSTmon" #'gmsst' # Set to None to do a linear detrend
 
 
 #%% First, restrict MLD and calculate kprev

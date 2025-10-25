@@ -19,11 +19,10 @@ import glob
 import xarray as xr
 import cartopy.crs as ccrs
 
-
 #%% Load Files
 
 dataset_name = "ORAS5_avg" #"ORAS5_avg_mld003"
-detrend      = "GMSST"
+detrend      = "GMSSTmon"
 
 #"oras5_mld_clim_cds"
 #"ORAS5_avg" 
