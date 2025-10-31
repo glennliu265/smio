@@ -111,7 +111,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250730/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20251106/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 proc.makedir(figpath)
 
@@ -262,8 +262,8 @@ detect_blowup   = True
 
 # (12) Draft 2 Edition (using case with GMSST Mon Detrend)
 comparename     = "Draft02"
-expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_SPGNE","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
-expnames_long   = ["Stochastic Model (No re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
 expnames_short  = ["SM","SM_REM","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
@@ -320,7 +320,6 @@ ssts_ds  = [proc.xrdetrend(ds.SST) for ds in dsa] # Detrend for Stochastic Model
 #%% Detrend ERA5 using Global Mean Regression Approach
 if (detrend_obs_regression):
     
-    # 
     sst_era = dsa[-1].SST # Take undetrended ERA5 SST
     sst_era = sst_era.expand_dims(dim=dict(lon=1,lat=1))
     
@@ -348,15 +347,80 @@ metrics_out  = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags,detrend_ac
 
 #%% Compute some additional metrics
 
+# Calculate Standard Deviations and Low-Pass Filtered Variance
 stds     = np.array([ds.std('time').data.item() for ds in ssts_ds])
 ssts_lp  = [proc.lp_butter(ts,120,6) for ts in ssts_ds]
 stds_lp  = np.array([np.std(ds) for ds in ssts_lp])
 vratio   = (stds_lp  / stds) * 100
 
+#%% Check Distribution of Anomalies
+
+kmonth  = None
+
+for kmonth in range(13):
+    
+    if kmonth == 13:
+        kmonth = None
+    hbins   = np.arange(-2,2.1,0.1)
+    fig,axs = plt.subplots(3,1,figsize=(6,8.5),constrained_layout=True)
+    
+    for ex in range(nexps):
+        
+        ax      = axs[ex]
+        
+        plotvar = ssts[ex]
+        
+        if kmonth is not None:
+            plotvar = plotvar[kmonth::12]
+            
+        
+        mu      = plotvar.mean()
+        sigma   = plotvar.std()
+        
+        #print(plotvar.mean())
+        ax.hist(plotvar,bins=hbins,edgecolor="w",color=expcols[ex],alpha=0.75,density=True)
+        
+        ax.axvline(mu,lw=0.75,c='k',label="$\mu$=%.2e" % mu)
+        ax.axvline(-sigma,lw=0.75,c='k',ls='dashed')
+        ax.axvline(-2*sigma,lw=0.75,c='k',ls='dotted')
+        ax.axvline(sigma,lw=0.75,c='k',ls='dashed',label="$1\sigma$=%.2f" % sigma)
+        ax.axvline(2*sigma,lw=0.75,c='k',ls='dotted',label="$2\sigma$=%.2f" % (2*sigma))
+        
+        
+        ax.set_xlim([-2,2])
+        ax.set_title("%s, Skew=%.2f" % (expnames_long[ex],sp.stats.skew(plotvar)))
+        
+        pdffit = sp.stats.norm.pdf(hbins,mu,sigma)
+        ax.plot(hbins,pdffit,label="PDF Fit",color='gray',lw=.55)
+        
+        ax.legend()
+        
+        if ex == 2:
+            if kmonth is not None:
+                ax.set_xlabel("%s SST Anomaly [$\degree C$]" % mons3[kmonth])
+            else:
+                ax.set_xlabel("SST Anomaly [$\degree C$]")
+        if ex == 1:
+            ax.set_ylabel("Frequency")
+        
+        viz.label_sp(ex,ax=ax,fig=fig)
+    
+    if kmonth is not None:
+        figname = "%sSM_vs_ERA5_Normality_Check_%s_mon%02i.png" % (figpath,comparename,kmonth+1)
+    else:
+        figname = "%sSM_vs_ERA5_Normality_Check_%s.png" % (figpath,comparename)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+
+
+
 #%% Plot ACF
 kmonth = 1
 xtks   = lags[::6]
 conf   = 0.95
+use_neff = True
+dofs_eff = np.zeros((nexps,12)) * np.nan
 
 for kmonth in range(12):
     fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
@@ -378,9 +442,14 @@ for kmonth in range(12):
         
         
         # Calcualate Confidence Interval
-        #neff  = proc.calc_dof()
+        if use_neff:
+            plotvar_mon = ssts[ex][kmonth::12]
+            dof_in      = proc.calc_dof(plotvar_mon,calc_r1=True,r1_in=None)
+            dofs_eff[ex,kmonth] = dof_in
+        else:
+            dof_in = len(ssts[ex])/12
         
-        cflag = proc.calc_conflag(plotvar,conf,2,len(ssts[ex])/12)
+        cflag = proc.calc_conflag(plotvar,conf,2,dof_in)
         if ex == 2:
             if darkmode:
                 alpha = 0.15
@@ -397,12 +466,30 @@ for kmonth in range(12):
     ax.set_xlabel("Lag from %s (Months)" % mons3[kmonth])
     ax.set_ylabel("Correlation with %s. Anomalies" % (mons3[kmonth]))
     
-    
-    figname = "%sACF_%s_mon%02i.png" % (figpath,comparename,kmonth+1)
+    figname = "%sACF_%s_neff%i_mon%02i.png" % (figpath,comparename,use_neff,kmonth+1)
     if darkmode:
         figname = proc.darkname(figname)
         #figname = proc.addstrtoext(figname,"_darkmode")
     plt.savefig(figname,dpi=150,transparent=transparent)
+    
+#%% Plot Effective DOF
+
+fig,axs =viz.init_monplot(3,1,figsize=(6,8.5))
+
+for ex in range(nexps):
+    ax = axs[ex]
+    blb = ax.bar(mons3,dofs_eff[ex,:],label=expnames_long[ex],alpha=1,color=expcols[ex],)
+    ax.bar_label(blb,fmt="%i")
+    
+    if ex == 1:
+        ax.set_ylabel("Degrees of Freedom")
+        
+    if ex < 2:
+        ax.set_ylim([0,10000])
+    else:
+        ax.set_ylim([0,50])
+    
+    ax.set_xlim([-1,12])
 
 
 
@@ -570,7 +657,6 @@ for ex in range(nexps):
     
     ax.plot(mons3,plotvar,label=expnames_long[ex],c=col_in,lw=2.5,ls=expls[ex])
 
-
 ax.set_ylim([-.2,.5])
 ax.set_ylabel("SST Variance [$\degree C^2$]",fontsize=fsz_axis)
 ax.tick_params(labelsize=fsz_tick)
@@ -585,11 +671,15 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 #%% Plot the monthly variance as a percentage
 
 ex      = 1
-pct_exp = (metrics_out['monvars'][ex] / metrics_out['monvars'][-1])*100
+pct_exp       = (metrics_out['monvars'][ex] / metrics_out['monvars'][-1])*100
+pct_exp_norem = (metrics_out['monvars'][0] / metrics_out['monvars'][-1])*100
 
 fig,ax  = viz.init_monplot(1,1,figsize=(8,4.5))
-bbar    = ax.bar(mons3,pct_exp,color=expcols[ex])
+bbar        = ax.bar(mons3,pct_exp,color=expcols[ex])
 ax.bar_label(bbar,fmt="%.01f",c=dfcol,fontsize=12)
+
+bbar_norem  = ax.bar(mons3,pct_exp_norem,color=expcols[0],alpha=0.90)
+ax.bar_label(bbar_norem,fmt="%.01f",c=dfcol,fontsize=12)
 
 ax.set_xlim([-1,12])
 ax.set_ylim([0,100])
@@ -601,6 +691,279 @@ if darkmode:
     figname = proc.addstrtoext(figname,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
+#%% Try to compute the exponential fit
+
+kmonth = 4
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
+ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax)
+
+for ex in range(nexps):
+    
+    if ex == nexps-1:
+        col_in = dfcol
+    else:
+        col_in = expcols[ex]
+    
+    plotvar = metrics_out['acfs'][kmonth][ex]
+    
+    
+    #expfit_out = proc.expfit(plotvar[[0,11,23]],lags[[0,11,23]],60)
+    
+    expfit_out = proc.expfit(plotvar[::12],lags[::12],60)
+    lagstheo       = np.linspace(0,60,100)
+    acftheo        = np.exp(expfit_out['tau_inv']*lagstheo) 
+    
+    
+    
+    
+    ax.plot(lags,plotvar,
+            label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5)
+    
+    
+    ax.plot(lagstheo,acftheo,
+            label=expnames_long[ex] + ", e-folding=%.2f months" % (-1*1/expfit_out['tau_inv']),color=col_in,ls='solid',lw=1)
+    
+    # ax.plot(lags[::12],expfit_out['acf_fit'],
+    #         label=expnames_long[ex] + "Efold=%.2f months" % (-1*1/expfit_out['tau_inv']),color=col_in,ls='solid',lw=1)
+    
+    # Calcualate Confidence Interval
+    #neff  = proc.calc_dof()
+    
+    cflag = proc.calc_conflag(plotvar,conf,2,len(ssts[ex])/12)
+    if ex == 2:
+        if darkmode:
+            alpha = 0.15
+        else:
+            alpha = 0.05
+    else:
+        alpha = 0.15
+    ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
+    
+ax.legend()
+
+ax.set_title("")
+#ax.set_title("%s SST Autocorrelation" % mons3[kmonth])
+ax.set_xlabel("Lag from %s (Months)" % mons3[kmonth])
+ax.set_ylabel("Correlation with %s. Anomalies" % (mons3[kmonth]))
+
+#%% Repeat computation of expfit for each month
+
+sellags_fit = lags[::12]
+
+taus = np.zeros((nexps,12)) * np.nan
+
+for kmonth in range(12):
+    for ex in range(nexps):
+        
+        if ex == nexps-1:
+            col_in = dfcol
+        else:
+            col_in = expcols[ex]
+        
+        plotvar = metrics_out['acfs'][kmonth][ex]
+        expfit_out = proc.expfit(plotvar[sellags_fit],lags[sellags_fit],60)
+        taus[ex,kmonth] = 1/expfit_out['tau_inv'] * -1
+        
+        #expfit_out = proc.expfit(plotvar[[0,11,23]],lags[[0,11,23]],60)
+        #lagstheo       = np.linspace(0,60,100)
+        #acftheo        = np.exp(expfit_out['tau_inv']*lagstheo) 
+        
+fig,ax = viz.init_monplot(1,1,figsize=(8.5,4.5))
+for ex in range(nexps):
+    ax.plot(mons3,taus[ex,:],color=expcols[ex],ls=expls[ex],lw=2.5,label=expnames_long[ex])
+    
+ax.legend()
+ax.set_xlabel("Base Month")
+ax.set_ylabel("E-folding Timescale (Months)")
+ax.set_yticks(np.arange(0,66,6))
+ax.set_title("Monthly E-Folding Timescale (5-year fit)")
+
+# =============================================================================
+#%% Bootstrap Spectra
+# =============================================================================
+# Based on tomoki's suggestion, try bootstrapping 
+
+nsmooth = 4
+mciter  = 10000
+ex      = 0
+pct     = 0.10
+
+eraspec_dict = scm.quick_spectrum([ssts[-1],],[nsmooth,],pct,return_dict=True)
+
+stochmod_conts     = []
+mc_specdicts = []
+
+for ex in range(2):
+    stochmod_ts  = ssts[ex]
+    
+    ntime_era         = len(ssts[-1])
+    mcdict            = proc.mcsampler(stochmod_ts,ntime_era,mciter)
+    stochmod_samples  = [mcdict['samples'][ii,:] for ii in range(mciter)]
+    
+    stochmod_specdict = scm.quick_spectrum(stochmod_samples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
+    specdict_cont     = scm.quick_spectrum([stochmod_ts,],[250,]*mciter,pct,return_dict=True)
+    stochmod_conts.append(specdict_cont)
+    mc_specdicts.append(stochmod_specdict)
+
+#%% =====  make the plot
+
+ex                = 0
+stochmod_specdict = mc_specdicts[ex]
+stochmod_cont     = stochmod_conts[ex]
+
+
+
+def init_specplot():
+    
+    
+    
+    fig,ax          = plt.subplots(1,1,figsize=(12.5,4.5))
+    
+    decadal_focus   = True
+    obs_cutoff      = 10 # in years
+    obs_cutoff      = 1/(obs_cutoff*12)
+    
+    dtmon_fix       = 60*60*24*30
+    
+    if decadal_focus:
+        xper            = np.array([20,10,5,1,0.5])
+    else:
+        xper            = np.array([40,10,5,1,0.5])
+    xper_ticks      = 1 / (xper*12)
+    
+    ax.set_xlim([xper_ticks[0],0.5])
+    ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
+    ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+    
+    ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
+    ax.set_ylabel("Power [$\degree C ^2 / cycle \, per \, mon$]",fontsize=fsz_axis)
+    
+    ax2 = ax.twiny()
+    ax2.set_xlim([xper_ticks[0],0.5])
+    ax2.set_xscale('log')
+    ax2.set_xticks(xper_ticks,labels=xper)
+    ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
+    
+    return fig,ax
+
+fig,ax = init_specplot()
+
+# Plot ERA
+plotspec  = eraspec_dict['specs'][0] / dtmon_fix
+plotfreq  = eraspec_dict['freqs'][0] *dtmon_fix
+ax.loglog(plotfreq,plotspec,marker="o",markersize=5,color="k",label="ERA5")
+
+# Plot Stochastic Model
+muspec    = stochmod_specdict['specs'].mean(0) / dtmon_fix
+plotfreq  = stochmod_specdict['freqs'][0,:] * dtmon_fix
+ax.loglog(plotfreq,muspec,marker="x",color="blue",label="Stochastic Model, %i-Sample Mean" % mciter)
+
+for mc in range(mciter):
+
+    sampspec    = stochmod_specdict['specs'][mc,:] / dtmon_fix
+    ax.loglog(plotfreq,sampspec,c=expcols[ex],alpha=0.01,zorder=1,label="")
+    
+
+bnds = np.quantile(stochmod_specdict['specs'] /dtmon_fix ,[0.025,0.9725],axis=0)
+ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
+ax.loglog(plotfreq,bnds[1],ls='dotted',color='blue')
+
+# Plot Stochastic Model (Full Timeseries)
+plotspec  = specdict_cont ['specs'][0] / dtmon_fix
+plotfreq  = specdict_cont ['freqs'][0] *dtmon_fix
+ax.loglog(plotfreq,plotspec,marker=".",markersize=1,color="violet",label="Stochastic Model, Continous Timeseries")
+
+ax.legend()
+
+figname = "%sSpectra_Confidence_test_mciter%i_%s.png" % (figpath,mciter,expnames[ex])
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Check Diferent smoothings and impact on ERA5 SSTs
+
+
+nsmooths_test = [1,2,3,4,5,10,25]
+
+era_ts = ssts[-1]
+
+
+erasmooth_test = scm.quick_spectrum([era_ts,]*len(nsmooths_test),nsmooths_test,pct,return_dict=True,make_arr=True)
+
+fig,ax         = init_specplot()
+
+for nn in range(len(nsmooths_test)):
+    
+    # Plot ERA
+    plotspec  = erasmooth_test['specs'][nn,:] / dtmon_fix
+    plotfreq  = erasmooth_test['freqs'][nn,:] * dtmon_fix
+    ax.loglog(plotfreq,plotspec,marker="o",markersize=5,label="nsmooth=%i" % nsmooths_test[nn],alpha=0.75)
+ax.legend()
+    
+
+
+
+figname = "%sSpectra_Smoothing_Test_ERA5.png" % (figpath)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+    
+#%% Bootstrapping the standard deviations
+
+mcstds      = []
+mcstds_lp   = []
+
+for ex in range(2):
+    stochmod_ts         = ssts[ex]
+    
+    ntime_era           = len(ssts[-1])
+    mcdict              = proc.mcsampler(stochmod_ts,ntime_era,mciter)
+    stochmod_samples    = [mcdict['samples'][ii,:] for ii in range(mciter)]
+    
+    stochmod_samples_lp = [proc.lp_butter(ts,120,6) for ts in stochmod_samples]
+    
+    
+    mcstds.append( np.nanstd(np.array(stochmod_samples),1) )
+    mcstds_lp.append( np.nanstd(np.array(stochmod_samples_lp),1) )
+    
+
+#%% Check Distribution of Variance
+
+bins    = np.arange(0,0.61,0.01)
+fig,axs = plt.subplots(2,1,constrained_layout=True)
+
+for ex in range(2):
+    
+    ax = axs[ex]
+    ax.hist(mcstds[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
+    
+    bnds = np.quantile(mcstds[ex],[0.025,0.9725])
+    mu   = np.nanmean(mcstds[ex])
+    
+    ax.axvline(stds[-1],color="k")
+    ax.axvline(stds[ex],color="blue",label="Full Timeseries = %.2f" % stds[ex])
+    ax.axvline(mu,label="$\mu=%.2f$" % mu,ls='solid',color='red')
+    ax.axvline(bnds[0],label="Lower Bnd = %.2f" % bnds[0],ls='dashed',color="red")
+    ax.axvline(bnds[1],label="Upper Bnd = %.2f" % bnds[1],ls='dashed',color="red")
+    
+    
+    
+    ax.set_xlim([0.25,0.60])
+    
+    ax.legend()
+    
+    
+
+    # csfit   = sp.stats.chi2.fit(mcstds[1])
+    # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
+    # ax.plot(bins,pdftheo)
+    ax.set_xlabel("SST Stdev [$\degree$ C]")
+    
+
+figname = "%sMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 # ====================================================
 #%% Plot ACF for Winter and Summer (For Paper Outline)
@@ -609,6 +972,9 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 fsz_title = 26
 fsz_ticks = 14
 plotkmons = [2,6]
+use_neff  = True
+conf      = 0.95
+
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(8,6.5))
 
 for ii in range(2):
@@ -628,7 +994,14 @@ for ii in range(2):
         ax.plot(lags,plotvar,
                 label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5)
         
-        cflag = proc.calc_conflag(plotvar,conf,2,len(ssts[ex])/12)
+        if use_neff:
+            dof_in = proc.calc_dof(ssts[ex][kmonth::12])
+        else:
+            dof_in = len(ssts[ex])/12
+        
+        print("%s for mon %i, DOF In = %.2f" % (expnames_long[ex],kmonth+1,dof_in))
+        
+        cflag = proc.calc_conflag(plotvar,conf,2,dof_in)
         if ex == 2:
             if darkmode:
                 alpha = 0.15
@@ -641,6 +1014,7 @@ for ii in range(2):
     if ii == 0:
         ax.set_xlabel("")
     else:
+        ax.set_xlabel("Lag [months]")
         ax.legend(framealpha=0,fontsize=fsz_ticks,ncol=2)
         
         
@@ -734,7 +1108,7 @@ obs_cutoff = 1/(obs_cutoff*12)
 dtmon_fix       = 60*60*24*30
 
 if decadal_focus:
-    xper            = np.array([20,10,5,1,0.5])
+    xper            = np.array([20,10,5,2,1,0.5])
 else:
     xper            = np.array([40,10,5,1,0.5])
 xper_ticks      = 1 / (xper*12)
@@ -753,13 +1127,36 @@ for ii in range(nexps):
     if ii == 2:
         iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
         ax.loglog(plotfreq,plotspec,label="",c=col_in,ls='dashed',lw=1.5)
-        plotfreq     = plotfreq[iplot_hifreq]
-        plotspec     = plotspec[iplot_hifreq]
+        hiplotfreq     = plotfreq[iplot_hifreq]
+        hiplotspec     = plotspec[iplot_hifreq]
         
-        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in)
+        ax.loglog(hiplotfreq,hiplotspec,lw=2.5,label=expnames_long[ii],c=col_in,zorder=2)
         
     else:
-        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in)
+        ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in,zorder=2)
+        
+    # Plot the 95% Confidence Interval (for stochastic model output)
+    if ii < 2:
+        plotspec1 = mc_specdicts[ii]['specs'] / dtmon_fix
+        plotfreq1 = mc_specdicts[ii]['freqs'][0,:] * dtmon_fix
+        
+        bnds = np.quantile( plotspec1 ,[0.025,0.9725],axis=0)
+        
+        ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
+        #ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
+        #ax.loglog(plotfreq,bnds[1],ls='dotted',color='blue')
+    else:
+        
+        # Plot Confidence Interval (ERA5)
+        alpha           = 0.05
+        cloc_era        = [2e-2,6]
+        dof_era         = metrics_out['dofs'][-1]
+        cbnds_era       = proc.calc_confspec(alpha,dof_era)
+        ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
+        #proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence (ERA5)") #+r" (dof= %.2f)" % dof_era)
+        
+        
+        
     
     #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
     #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
@@ -768,6 +1165,7 @@ ax.set_xlim([xper_ticks[0],0.5])
 ax.axvline([1/(6)],label="",ls='dotted',c='gray')
 ax.axvline([1/(12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(2*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
@@ -781,12 +1179,8 @@ ax2.set_xscale('log')
 ax2.set_xticks(xper_ticks,labels=xper)
 ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
 
-# Plot Confidence Interval (ERA5)
-alpha           = 0.05
-cloc_era        = [2e-2,6]
-dof_era         = metrics_out['dofs'][-1]
-cbnds_era       = proc.calc_confspec(alpha,dof_era)
-proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+
+
 ax.legend(fontsize=fsz_legend,framealpha=0.5,edgecolor='none')
 
 for ax in [ax,ax2]:
