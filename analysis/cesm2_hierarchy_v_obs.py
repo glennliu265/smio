@@ -44,7 +44,7 @@ import cvd_utils as cvd
 #%% User Edits
 
 # Indicate Paths (processed output by crop_natl_CESM2.py)
-dpath           = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/NAtl/Old/"
+dpath                   = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/NAtl/Old/"
 
 # Load GMSST For ERA5 Detrending
 detrend_obs_regression  = True
@@ -171,7 +171,6 @@ ds_era      = xr.open_dataset(ncname_era).sst.load()
 ncname_era_flx = dpath_era + "ERA5_qnet_NAtl_1979to2024.nc"
 ds_era_flx = xr.open_dataset(ncname_era_flx).qnet.load()
 
-
 # Load Mask
 dsmask_era  = dl.load_mask(expname='ERA5')
 
@@ -183,9 +182,9 @@ flxa_era      = proc.xrdeseason(ds_era_flx)
 
 # Detrend by Regression to the global Mean
 ds_gmsst      = xr.open_dataset(dpath_era + nc_gmsst).GMSST_MaxIce.load()
-dtout         = proc.detrend_by_regression(dsa_era,ds_gmsst)
+dtout         = proc.detrend_by_regression(dsa_era,ds_gmsst,regress_monthly=True)
 sst_era       = dtout.sst
-dtout_flx     = proc.detrend_by_regression(flxa_era,ds_gmsst)
+dtout_flx     = proc.detrend_by_regression(flxa_era,ds_gmsst,regress_monthly=True)
 flx_era       = dtout_flx.qnet
 
 proc.printtime(st,print_str="Loaded and procesed data") #15.86s
@@ -330,6 +329,8 @@ for rr in range(2):
         
         #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
         #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
+        
+        
     
     ax.set_xlim([1/1000,0.5])
     ax.axvline([1/(6)],label="",ls='dotted',c='gray')
@@ -362,6 +363,82 @@ for rr in range(2):
         figname = proc.darkname(figname)
     plt.savefig(figname,transparent=transparent,bbox_inches='tight',dpi=150)
     
+# =============================================================================
+#%% Compute Significance for each case
+# =============================================================================   
+
+sstsin = aavgs_byreg[0]
+
+nsmooth = 4
+mciter  = 10000
+ex      = 0
+pct     = 0.10
+
+
+
+
+cesm_conts      = []
+cesm_specdicts  = []
+for ex in range(3):
+    cesm_ts   = sstsin[ex].data
+    ntime_era = len(sstsin[-1])
+    
+    mcdict        = proc.mcsampler(cesm_ts,ntime_era,mciter)
+    csamples      = [mcdict['samples'][ii,:] for ii in range(mciter)]
+    
+    cesm_specdict = scm.quick_spectrum(csamples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
+    cesm_cont     = scm.quick_spectrum([cesm_ts,],[nsmooths[ex],]*mciter,pct,return_dict=True)
+    
+    cesm_conts.append(cesm_cont)
+    cesm_specdicts.append(cesm_specdict)
+
+# =============================================================================
+#%% Also Take samples of the variance
+# =============================================================================
+    
+    
+stds        = stds_metrics[0][1]
+stds_lp     = stds_metrics[0][2]
+
+#def mcsample_spectra(ts,samplen,nsmooth):
+
+mcstds      = []
+mcstds_lp   = []
+for ex in range(3):
+    cesm_ts         = sstsin[ex]
+    
+    ntime_era       = len(ssts[-1])
+    mcdict          = proc.mcsampler(cesm_ts,ntime_era,mciter)
+    cesm_samples    = [mcdict['samples'][ii,:] for ii in range(mciter)]
+    
+    cesm_samples_lp = [proc.lp_butter(ts,120,6) for ts in cesm_samples]
+    
+    
+    mcstds.append( np.nanstd(np.array(cesm_samples),1) )
+    mcstds_lp.append( np.nanstd(np.array(cesm_samples_lp),1) )
+
+#%% Setup for barplot
+
+errbar_var      = np.zeros((2,nexps))
+errbar_var_lp   = np.zeros((2,nexps))
+
+mcstds_arr      = np.array(mcstds) # [exp,sample]
+mcstds_lp_arr   = np.array(mcstds_lp)
+
+lowervar        = np.abs(np.quantile(mcstds,0.025,axis=1) - stds[:3]) # Can't be negative
+uppervar        = np.quantile(mcstds,0.975,axis=1) - stds[:3]
+
+errbar_var[0,:] = np.hstack([lowervar,[None,]])
+errbar_var[1,:] = np.hstack([uppervar,[None,]])
+
+lowervar_lp = np.abs(np.quantile(mcstds_lp,0.025,axis=1) - stds_lp[:3]) # Can't be negative
+uppervar_lp = np.quantile(mcstds_lp,0.975,axis=1) - stds_lp[:3]
+
+errbar_var_lp[0,:] = np.hstack([lowervar_lp,[None,]])
+errbar_var_lp[1,:] = np.hstack([uppervar_lp,[None,]])
+
+
+
 # ======================
 #%% Make the Combined Barplot and Spectra for Paper Outline
 # ======================
@@ -435,8 +512,8 @@ if decadal_focus:
     xper            = np.array([20,10,5,1,0.5])
 else:
     xper            = np.array([40,10,5,1,0.5])
-xper_ticks      = 1 / (xper*12)
 
+xper_ticks      = 1 / (xper*12)
 dtmon_fix       = 60*60*24*30
 
 for ii in range(nexps):
@@ -453,14 +530,33 @@ for ii in range(nexps):
         
         iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
         ax.loglog(plotfreq,plotspec,label="",c=color_in,ls='dashed',lw=1.5)
-        plotfreq     = plotfreq[iplot_hifreq]
-        plotspec     = plotspec[iplot_hifreq]
+        plotfreqhi     = plotfreq[iplot_hifreq]
+        plotspechi     = plotspec[iplot_hifreq]
         
-        ax.loglog(plotfreq,plotspec,lw=4,label=expnames_long[ii],c=color_in)
+        ax.loglog(plotfreqhi,plotspechi,lw=4,label=expnames_long[ii],c=color_in)
         
     else:
         
         ax.loglog(plotfreq,plotspec,lw=4,label=expnames_long[ii],c=color_in)
+        
+        
+    
+    # Plot the 95% Confidence Interval (for stochastic model output)
+    if ii < 3:
+        plotspec1 = cesm_specdicts[ii]['specs'] / dtmon_fix
+        plotfreq1 = cesm_specdicts[ii]['freqs'][0,:] * dtmon_fix
+        
+        bnds      = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
+        ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
+    else: # plot for ERA5
+    
+        # Plot Confidence Interval (ERA5)
+        alpha           = 0.05
+        cloc_era        = [2e-2,6]
+        dof_era         = metrics_out['dofs'][-1]
+        cbnds_era       = proc.calc_confspec(alpha,dof_era)
+        ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
+    
     
     #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
     #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
@@ -498,7 +594,6 @@ for ax in [ax,ax2]:
     
 viz.label_sp(1,alpha=0.15,ax=ax,fontsize=fsz_title,y=1.17,x=-.1,
              fontcolor=dfcol)
-
 
 figname = "%s%s_NASST_Spectra_Barplot.png" % (figpath,bbnames[rr])
 if darkmode:
