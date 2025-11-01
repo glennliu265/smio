@@ -152,7 +152,7 @@ expls           = ["dotted","dashed",'solid']
 comparename     = "IncludeInsig"
 expnames        = ["SST_Obs_Pilot_00_Tdcorr1_qnet_noPositive_SPGNE","SST_Obs_Pilot_00_Tdcorr0_qnet_noPositive","SST_ERA5_1979_2024"]
 expnames_long   = ["Stochastic Model","Stochastic Model (with re-emergence)","ERA5"]
-expnames_short  = ["SM","SM_REM","ERA5"]
+expnames_short  = ["SM_NoREM","SM_REM","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
 
@@ -264,7 +264,7 @@ detect_blowup   = True
 comparename     = "Draft02"
 expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
 expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
-expnames_short  = ["SM","SM_REM","ERA5"]
+expnames_short  = ["SM_NoREM","SM_REM","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
 detect_blowup   = True
@@ -472,7 +472,67 @@ for kmonth in range(12):
         #figname = proc.addstrtoext(figname,"_darkmode")
     plt.savefig(figname,dpi=150,transparent=transparent)
     
-#%% Plot Effective DOF
+#%% Plot ACF minigrid
+
+plot_im  = np.roll(np.arange(12),1)
+fig,axs = plt.subplots(4,3,constrained_layout=True,figsize=(10,8))
+
+alphalist = list(map(chr, range(97, 123)))
+alphalist_upper = [s.upper() for s in alphalist]
+
+for mm in range(12):
+    
+    ax     = axs.flatten()[mm]
+    kmonth = plot_im[mm]
+    lab    = "%s) %s" % (alphalist_upper[mm],mons3[kmonth])
+    viz.label_sp(lab,ax=ax,labelstyle="%s",usenumber=True)
+    if mm == 10:
+        ax.set_xlabel("Lag [month]")
+    
+    
+    # Plot ACFs (copied from above) ===========================================
+    for ex in range(nexps):
+        if ex == nexps-1:
+            col_in = dfcol
+        else:
+            col_in = expcols[ex]
+        
+        plotvar = metrics_out['acfs'][kmonth][ex]
+        ax.plot(lags,plotvar,
+                label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5)
+        # Calcualate Confidence Interval
+        if use_neff:
+            plotvar_mon = ssts[ex][kmonth::12]
+            dof_in      = proc.calc_dof(plotvar_mon,calc_r1=True,r1_in=None)
+            dofs_eff[ex,kmonth] = dof_in
+        else:
+            dof_in = len(ssts[ex])/12
+        cflag = proc.calc_conflag(plotvar,conf,2,dof_in)
+        if ex == 2:
+            if darkmode:
+                alpha = 0.15
+            else:
+                alpha = 0.05
+        else:
+            alpha = 0.15
+        ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
+        
+    # =========================================================================
+    
+    ax.set_xlim([0,60])
+    ax.set_ylim([-0.25,1.25])
+    ax.set_xticks(np.arange(0,66,6))
+    ax.set_yticks(np.arange(0,1.25,0.25))
+    ax.axhline([0],ls='dashed',c='k',lw=0.55)
+    if mm == 0:
+        ax.legend(fontsize=7,framealpha=.0)
+    
+    
+figname = "%sACF_%s_neff%i_AllMonths.png" % (figpath,comparename,use_neff)
+plt.savefig(figname,dpi=150,transparent=transparent) 
+
+#%%
+#viz.add_ylabel("Correlation",ax=ax)#%% Plot Effective DOF
 
 fig,axs =viz.init_monplot(3,1,figsize=(6,8.5))
 
@@ -869,7 +929,7 @@ for mc in range(mciter):
     ax.loglog(plotfreq,sampspec,c=expcols[ex],alpha=0.01,zorder=1,label="")
     
 
-bnds = np.quantile(stochmod_specdict['specs'] /dtmon_fix ,[0.025,0.9725],axis=0)
+bnds = np.quantile(stochmod_specdict['specs'] /dtmon_fix ,[0.025,0.975],axis=0)
 ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
 ax.loglog(plotfreq,bnds[1],ls='dotted',color='blue')
 
@@ -932,38 +992,102 @@ for ex in range(2):
 #%% Check Distribution of Variance
 
 bins    = np.arange(0,0.61,0.01)
-fig,axs = plt.subplots(2,1,constrained_layout=True)
+fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6))
 
-for ex in range(2):
+iilab = [0,2,1,3]
+ii    = 0
+for vv in range(2):
     
-    ax = axs[ex]
-    ax.hist(mcstds[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
+    if vv == 0: # Raw
+        mcstds_in = mcstds
+        stds_in    = stds
+        xlm       = [0.25,0.60]
+        xlab      = "$\sigma(SST)$"
+        
+    else:       # LP Filter
+        mcstds_in = mcstds_lp
+        stds_in   = stds_lp
+        xlm       = [0,0.50]
+        xlab      = "10-year LP Filtered $\sigma(SST)$"
+        
+    for ex in range(2):
+        
+        ax = axs[ex,vv]
+        ax.hist(mcstds_in[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
+        
+        bnds = np.quantile(mcstds_in[ex],[0.025,0.975])
+        mu   = np.nanmean(mcstds_in[ex])
+        
+        ax.axvline(stds_in[-1],color="k",label="ERA5 = %.2f" % stds_in[-1])
+        
+        ax.axvline(stds_in[ex],color="blue",label="$\mu$ (Full Timeseries) = %.2f" % stds_in[ex])
+        ax.axvline(mu,label="$\mu$ (Samples)= %.2f" % mu,ls='solid',color='gray')
+        ax.axvline(bnds[0],label="95%% Lower Bnd = %.2f" % bnds[0],ls='dashed',color="gray")
+        ax.axvline(bnds[1],label="95%% Upper Bnd = %.2f" % bnds[1],ls='dashed',color="gray")
+        
+        
+        
+        ax.set_xlim(xlm)
+        ax.set_ylim([0,25])
+        ax.legend()
+        
+        # csfit   = sp.stats.chi2.fit(mcstds[1])
+        # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
+        # ax.plot(bins,pdftheo)
+        if ex == 1:
+            ax.set_xlabel("%s [$\degree$ C]" % xlab)
+        
+        if vv == 0:
+            ax.set_ylabel("Frequency\n%s" % expnames_long[ex])
     
-    bnds = np.quantile(mcstds[ex],[0.025,0.9725])
-    mu   = np.nanmean(mcstds[ex])
-    
-    ax.axvline(stds[-1],color="k")
-    ax.axvline(stds[ex],color="blue",label="Full Timeseries = %.2f" % stds[ex])
-    ax.axvline(mu,label="$\mu=%.2f$" % mu,ls='solid',color='red')
-    ax.axvline(bnds[0],label="Lower Bnd = %.2f" % bnds[0],ls='dashed',color="red")
-    ax.axvline(bnds[1],label="Upper Bnd = %.2f" % bnds[1],ls='dashed',color="red")
-    
-    
-    
-    ax.set_xlim([0.25,0.60])
-    
-    ax.legend()
-    
-    
-
-    # csfit   = sp.stats.chi2.fit(mcstds[1])
-    # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
-    # ax.plot(bins,pdftheo)
-    ax.set_xlabel("SST Stdev [$\degree$ C]")
-    
+        viz.label_sp(iilab[ii],ax=ax,fig=fig)
+        ii += 1
 
 figname = "%sMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Try getting confidence interval for ERA5
+
+ntime_era       = len(ssts[-1])
+n_eff           = proc.calc_dof(ssts[-1],) # calculate effective dof
+
+# Get theoretical chi^2 PDF using n_eff-1
+
+xvariances      = np.linspace(0,1,100)
+era5var_pdf     = sp.stats.chi2.pdf(xvariances,n_eff-1,)#loc=stds[-1]**2)
+
+plt.plot(xvariances,era5var_pdf)
+
+nu      = n_eff -1 
+alpha   = 0.05
+upperv  = sp.stats.chi2.isf(1-alpha/2,nu)
+lowerv  = sp.stats.chi2.isf(alpha/2,nu)
+
+lower   = nu / lowerv
+upper   = nu / upperv
+
+lowerbnd_era5 = np.sqrt(lower)
+upperbnd_era5 = np.sqrt(upper)
+
+#%% Setup for barplot
+
+errbar_var      = np.zeros((2,nexps))
+errbar_var_lp   = np.zeros((2,nexps))
+
+mcstds_arr      = np.array(mcstds) # [exp,sample]
+mcstds_lp_arr   = np.array(mcstds_lp)
+
+lowervar        = np.abs(np.quantile(mcstds,0.025,axis=1) - stds[:2]) # Can't be negative
+uppervar        = np.quantile(mcstds,0.975,axis=1) - stds[:2]
+
+errbar_var[0,:] = np.hstack([lowervar,[None,]])
+errbar_var[1,:] = np.hstack([uppervar,[None,]])
+
+lowervar_lp = np.abs(np.quantile(mcstds_lp,0.025,axis=1) - stds_lp[:2]) # Can't be negative
+uppervar_lp = np.quantile(mcstds_lp,0.975,axis=1) - stds_lp[:2]
+
+errbar_var_lp[0,:] = np.hstack([lowervar_lp,[None,]])
+errbar_var_lp[1,:] = np.hstack([uppervar_lp,[None,]])
 
 # ====================================================
 #%% Plot ACF for Winter and Summer (For Paper Outline)
@@ -982,6 +1106,7 @@ for ii in range(2):
     kmonth = plotkmons[ii]
     
     ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+    
     for ex in range(nexps):
         
         if ex == nexps-1:
@@ -1009,15 +1134,17 @@ for ii in range(2):
                 alpha = 0.05
         else:
             alpha = 0.15
+        
         ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
         
     if ii == 0:
+        
         ax.set_xlabel("")
+        
     else:
         ax.set_xlabel("Lag [months]")
         ax.legend(framealpha=0,fontsize=fsz_ticks,ncol=2)
-        
-        
+    
     ax.set_ylim([-.25,1])
     
     ax.set_title("")
@@ -1056,6 +1183,8 @@ fsz_axis         = 18
 fsz_ticks        = 16
 fsz_legend       = 14
 
+ytks_var        = np.arange(0,1.2,0.2)
+
 instd           = stds
 instd_lp        = stds_lp
 
@@ -1064,8 +1193,18 @@ if label_vratio:
 else:
     xlabs  = expnames_short
 
-braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
-blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol)
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=errbar_var,
+                         error_kw=dict(ecolor='darkgray',
+                                       barsabove=True,
+                                       capsize=5,marker="o",markersize=25,mfc='None',
+                                       ))
+blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_lp,
+                         error_kw=dict(ecolor='w',
+                                       barsabove=True,
+                                       capsize=5,marker="d",markersize=25,mfc='None',))
+
+
+
 
 if darkmode:
     upperlbl_col = 'lightgray'
@@ -1073,7 +1212,7 @@ else:
     upperlbl_col = 'gray'
 
 ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
-ax.bar_label(blp,fmt="%.02f",c=dfcol,fontsize=fsz_axis)
+ax.bar_label(blp,fmt="%.02f",c='w',fontsize=fsz_axis,label_type='center')
 
 # --- Make Fake Legend'
 colorsf = {'Raw':'gray','10-year Low-pass':'k',}         
@@ -1086,6 +1225,7 @@ ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0)
 ax.set_xticks(np.arange(nexps),labels=xlabs,fontsize=fsz_tick,rotation=45)
 ax.set_ylabel("$\sigma$(SST) [$\degree$C]",fontsize=fsz_axis)
 ax.set_ylim([0,1.0])
+ax.set_yticks(ytks_var)
 ax.tick_params(labelsize=fsz_tick)
 
 if remove_topright:
@@ -1122,14 +1262,12 @@ for ii in range(nexps):
     plotspec        = metrics_out['specs'][ii] / dtmon_fix
     plotfreq        = metrics_out['freqs'][ii] * dtmon_fix
     CCs = metrics_out['CCs'][ii] / dtmon_fix
-
     
     if ii == 2:
         iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
         ax.loglog(plotfreq,plotspec,label="",c=col_in,ls='dashed',lw=1.5)
         hiplotfreq     = plotfreq[iplot_hifreq]
         hiplotspec     = plotspec[iplot_hifreq]
-        
         ax.loglog(hiplotfreq,hiplotspec,lw=2.5,label=expnames_long[ii],c=col_in,zorder=2)
         
     else:
@@ -1140,7 +1278,7 @@ for ii in range(nexps):
         plotspec1 = mc_specdicts[ii]['specs'] / dtmon_fix
         plotfreq1 = mc_specdicts[ii]['freqs'][0,:] * dtmon_fix
         
-        bnds = np.quantile( plotspec1 ,[0.025,0.9725],axis=0)
+        bnds = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
         
         ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
         #ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
@@ -1154,9 +1292,6 @@ for ii in range(nexps):
         cbnds_era       = proc.calc_confspec(alpha,dof_era)
         ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
         #proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence (ERA5)") #+r" (dof= %.2f)" % dof_era)
-        
-        
-        
     
     #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
     #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
@@ -1179,8 +1314,6 @@ ax2.set_xscale('log')
 ax2.set_xticks(xper_ticks,labels=xper)
 ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
 
-
-
 ax.legend(fontsize=fsz_legend,framealpha=0.5,edgecolor='none')
 
 for ax in [ax,ax2]:
@@ -1193,12 +1326,4 @@ figname = "%sVariance_%s_PaperOutline.png" % (figpath,comparename)
 if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight')
-
-
-#%% Compare Monthly Averages
-
-
-
-
-#%% Look at correlation with northward heat transport
 
