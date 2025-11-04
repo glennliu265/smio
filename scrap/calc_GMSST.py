@@ -10,8 +10,6 @@ Created on Tue May 13 13:47:23 2025
 
 """
 
-
-
 import time
 import numpy as np
 import numpy.ma as ma
@@ -156,7 +154,6 @@ dsout.to_netcdf(outname,encoding=edict)
 
 
 #%%
-
 #%%
 # Load Ice Mask
 ds_mask = dl.load_mask(expname="ERA5").mask

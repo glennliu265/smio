@@ -1182,11 +1182,10 @@ label_vratio    = False
 fsz_axis         = 18
 fsz_ticks        = 16
 fsz_legend       = 14
+ytks_var         = np.arange(0,1.2,0.2)
 
-ytks_var        = np.arange(0,1.2,0.2)
-
-instd           = stds
-instd_lp        = stds_lp
+instd            = stds
+instd_lp         = stds_lp
 
 if label_vratio:
     xlabs           = ["%s\n%.2f" % (expnames_long[ii],vratio[ii])+"%" for ii in range(len(vratio))]

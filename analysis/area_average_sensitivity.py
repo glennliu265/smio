@@ -47,14 +47,10 @@ import scm
 import amv.loaders as dl
 import cvd_utils as cvd
 
-
-
-
-
 #%% Plotting Inputs
 
 # Set Plotting Options
-darkmode = True
+darkmode = False
 if darkmode:
     dfcol = "w"
     bgcol = np.array([15,15,15])/256
@@ -103,6 +99,17 @@ expnames        = ["SST_Obs_Pilot_00_Tdcorr0_qnet","SST_Obs_Pilot_00_Tdcorr1_qne
 expnames_long   = ["Stochastic Model (with re-emergence)","Stochastic Model","ERA5"]
 expcols         = ["turquoise","goldenrod","k"]
 expls           = ["dotted","dashed",'solid']
+
+# (12) Draft 2 Edition (using case with GMSST Mon Detrend)
+comparename     = "Draft02"
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
+expnames_short  = ["SM","SM_REM","ERA5"]
+expcols         = ["goldenrod","turquoise","k"]
+expls           = ["dashed","dotted",'solid']
+detect_blowup   = True
+
+
 
 nexps           = len(expnames)
 
@@ -214,6 +221,7 @@ if recompute:
         edict   = proc.make_encoding_dict(dsout)
         dsout.to_netcdf(outname,encoding=edict)
 else:
+    
     #% Load
     ssts_reg = []
     for ex in range(nexps): 
@@ -328,7 +336,7 @@ plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Find time with the best fit
 
-lpcutoff  = 120
+lpcutoff  = 240
 ntime_sm  = len(ssts_arr[0])
 
 nsegments = ntime_sm - ntime_era
@@ -373,6 +381,8 @@ ylims             = [-2,2]
 # Initialize Fig
 fig,axs           = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
 
+imins_sel = 0
+
 # Plot Era
 ax         = axs[0]
 ax.plot(era_sst,label=expnames_long[-1],c=dfcol)
@@ -386,7 +396,7 @@ era_lp  = proc.lp_butter(era_sst,120,6)
 
 
 if label_actual_year:
-    times_sm   = ssts_reg[0].time.data[imins[1]:imins[1]+ntime_era]
+    times_sm   = ssts_reg[0].time.data[imins[imins_sel]:imins[imins_sel]+ntime_era]
 else:
     times_sm   = ssts_reg[0].time.data[:ntime_era]
 years_sm   = [str(t)[:4] for t in times_sm]
@@ -394,8 +404,8 @@ years_sm   = [str(t)[:4] for t in times_sm]
 
 # Plot SM
 ax = axs[1]
-ax.plot(ssts_arr[0][imins[1]:imins[1]+ntime_era],label=expnames_long[0],c=expcols[0])
-ax.plot(ssts_arr[1][imins[1]:imins[1]+ntime_era],label=expnames_long[1],c=expcols[1])
+ax.plot(ssts_arr[0][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[0],c=expcols[0])
+ax.plot(ssts_arr[1][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[1],c=expcols[1])
 ax.legend(fontsize=fsz_legend)
 
 # Label Axes
@@ -414,7 +424,6 @@ ax.set_xticks(xplot[::plotint],labels=years[::plotint])
 
 ax = axs[1]
 ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
-
 
 figname = "%sSST_SM_ERA5_Timeseries_Comparison_%s_istart%05i_lpf%02i.png" % (figpath,comparename,imins[1],lpcutoff)
 if darkmode:

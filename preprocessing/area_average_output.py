@@ -73,7 +73,7 @@ outformat = "%s%s_%s_%04d_%04d_%s.nc"
 
 # If smoutput is <True>... ----------------------------------------------------
 # Use sm loader and output path to metrics folder
-expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_SPGNE" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
+expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
 vname       = "SST"
 concat_dim  = "time"
 

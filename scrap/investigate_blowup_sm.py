@@ -77,7 +77,7 @@ outformat = "%s%s_%s_%04d_%04d_%s.nc"
 
 # If smoutput is <True>... ----------------------------------------------------
 # Use sm loader and output path to metrics folder
-expname     = "SST_ORAS5_avg_GMSSTmon" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
+expname     = "SST_ORAS5_avg_GMSSTmon_EOF" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
 vname       = "SST"
 concat_dim  = "time"
 
@@ -121,8 +121,8 @@ for nr in tqdm.tqdm( range(10)):
     
     ax.set_xticks(np.arange(-40,-37.25,0.25))
     ax.set_yticks(np.arange(59,60.25,0.25))
-    ax.set_ylim([59,60])
-    ax.set_xlim([-40,-38])
+    #ax.set_ylim([59,60])
+    #ax.set_xlim([-40,-38])
 
 cb = viz.hcbar(pcm,ax=axs.flatten())
 
@@ -136,7 +136,7 @@ plt.show()
 dsall.sel(lat=59.75,lon=-39.75,method='nearest').isel(run=0).plot()
 plt.plot(dsall.sel(lat=59.75,lon=-39.75,method='nearest').isel(run=0).SST)
 
- dsstd.isel(run=0).sel(lat=59.75,lon=-39.75,method='nearest')
+dsstd.isel(run=0).sel(lat=59.75,lon=-39.75,method='nearest')
     
     #ds = dsstd.isel(run=nr,ax)
     

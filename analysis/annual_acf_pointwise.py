@@ -79,6 +79,16 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 
 
 
+# # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression,EACH MONTH, No reemergence>
+# # ---------------------------
+outname_data = "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
 # Output Information
 # -----------------------------
 #outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
