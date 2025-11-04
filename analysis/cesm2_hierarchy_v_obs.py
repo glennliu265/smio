@@ -166,7 +166,6 @@ dpath_era   = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
 ncname_era  = dpath_era + "ERA5_sst_NAtl_1979to2024.nc"
 ds_era      = xr.open_dataset(ncname_era).sst.load()
 
-
 # Load Flux
 ncname_era_flx = dpath_era + "ERA5_qnet_NAtl_1979to2024.nc"
 ds_era_flx = xr.open_dataset(ncname_era_flx).qnet.load()
@@ -200,8 +199,6 @@ bboxes      = [bbox_spgne,bbox_nnat]
 bbnames           = ["SPGNE","NNAT"]
 bbnames_long      = ["Northeastern Subpolar Gyre",
                     "Extratropical North Atlantic"]
-
-
 
 dsall       =  dscesms_proc + [sst_era,]
 expnames    =  cesmnames  + ["ERA5",]
@@ -266,7 +263,7 @@ fsz_axis    = 18
 fsz_ticks   = 16
 label_ratio = False
 for rr in range(nregs):
-
+    
     instd           = stds_metrics[rr][1]
     instd_lp        = stds_metrics[rr][2]
     vratio          = stds_metrics[rr][3]
@@ -474,8 +471,16 @@ else:
     xlabs           = expnames_short_new
 
 
-braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
-blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol)
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,) #yerr=errbar_var,
+                         # error_kw=dict(ecolor='darkgray',
+                         #               barsabove=True,
+                         #               capsize=5,marker="o",markersize=25,mfc='None',
+                         #               ))
+blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,)#yerr=errbar_var_lp,
+                         # error_kw=dict(ecolor='w',
+                         #               barsabove=True,
+                         #               capsize=5,marker="o",markersize=25,mfc='None',
+                         #               ))
 
 ax.bar_label(braw,fmt="%.02f",c='gray',fontsize=fsz_ticks)
 ax.bar_label(blp,fmt="%.02f",c=dfcol,fontsize=fsz_ticks)
@@ -543,20 +548,21 @@ for ii in range(nexps):
     
     # Plot the 95% Confidence Interval (for stochastic model output)
     if ii < 3:
+        
         plotspec1 = cesm_specdicts[ii]['specs'] / dtmon_fix
         plotfreq1 = cesm_specdicts[ii]['freqs'][0,:] * dtmon_fix
-        
         bnds      = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
         ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
+        
     else: # plot for ERA5
-    
+        
         # Plot Confidence Interval (ERA5)
         alpha           = 0.05
         cloc_era        = [2e-2,6]
         dof_era         = metrics_out['dofs'][-1]
         cbnds_era       = proc.calc_confspec(alpha,dof_era)
         ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
-    
+        
     
     #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
     #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
@@ -578,12 +584,12 @@ ax2.set_xscale('log')
 ax2.set_xticks(xper_ticks,labels=xper,fontsize=fsz_ticks)
 ax2.set_xlabel("Period (Years)",fontsize=fsz_ticks)
 
-# Plot Confidence Interval (ERA5)
-alpha           = 0.05
-cloc_era        = [8e-2,1e-2]
-dof_era         = metrics_out['dofs'][-1]
-cbnds_era       = proc.calc_confspec(alpha,dof_era)
-proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+# # Plot Confidence Interval (ERA5)
+# alpha           = 0.05
+# cloc_era        = [8e-2,1e-2]
+# dof_era         = metrics_out['dofs'][-1]
+# cbnds_era       = proc.calc_confspec(alpha,dof_era)
+# proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
 
 ax.set_ylim(ylim)
 
