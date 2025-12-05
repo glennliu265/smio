@@ -296,7 +296,6 @@ for rr in range(nregs):
         
     plt.savefig(figname,bbox_inches='tight',transparent=transparent,dpi=150)
 
-
 #%% Make the Spectra Plots
 
 rr = 0
@@ -442,6 +441,7 @@ errbar_var_lp[1,:] = np.hstack([uppervar_lp,[None,]])
 
 
 remove_topright = True
+add_errbar      = True
 
 
 
@@ -470,17 +470,20 @@ if label_ratio:
 else:
     xlabs           = expnames_short_new
 
-
-braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,) #yerr=errbar_var,
-                         # error_kw=dict(ecolor='darkgray',
-                         #               barsabove=True,
-                         #               capsize=5,marker="o",markersize=25,mfc='None',
-                         #               ))
-blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,)#yerr=errbar_var_lp,
-                         # error_kw=dict(ecolor='w',
-                         #               barsabove=True,
-                         #               capsize=5,marker="o",markersize=25,mfc='None',
-                         #               ))
+if add_errbar:
+    braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=errbar_var,
+                              error_kw=dict(ecolor='darkgray',
+                                            barsabove=True,
+                                            capsize=5,marker="o",markersize=25,mfc='None',
+                                            ))
+    blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_lp,
+                              error_kw=dict(ecolor='w',
+                                            barsabove=True,
+                                            capsize=5,marker="o",markersize=25,mfc='None',
+                                            ))
+else:
+    braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,)
+    blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,)
 
 ax.bar_label(braw,fmt="%.02f",c='gray',fontsize=fsz_ticks)
 ax.bar_label(blp,fmt="%.02f",c=dfcol,fontsize=fsz_ticks)
@@ -525,8 +528,7 @@ for ii in range(nexps):
     plotspec        = metrics_out['specs'][ii] / dtmon_fix
     plotfreq        = metrics_out['freqs'][ii] * dtmon_fix
     CCs             = metrics_out['CCs'][ii] / dtmon_fix
-
-
+    
     color_in = expcols[ii]
     if color_in == "k" and darkmode:
         color_in = dfcol
