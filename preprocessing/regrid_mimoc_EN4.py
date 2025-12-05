@@ -79,6 +79,33 @@ mld_regridded = mld_regridded.rename('mld')
 edict = {'mld':{'zlib':True}}
 mld_regridded.to_netcdf(outname,encoding=edict)
 
+#%% Also create "SOM" case that uses the mean climatological MLD
+
+# Reload the regridded MLD
+hpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+ncname = "MIMOC_regridERA5_h_pilot.nc"
+
+
+dsmld       = xr.open_dataset(hpath+ncname).load()
+
+dsmld_mean  = dsmld.h.mean('mon') 
+
+# Broadcast operation 
+# Interestingly this preserves the NaNs
+dsout       = xr.ones_like(dsmld.h) * dsmld_mean
+
+# Check diff
+dsdiff      = dsout - dsout.isel(mon=2)
+
+fig,axs = plt.subplots(3,4)
+for im in range(12):
+    ax = axs.flatten()[im]
+    dsdiff.isel(mon=im).plot(ax=ax)
+    
+
+outname  = '%sMIMOC_regridERA5_h_pilot_mean.nc' % hpath
+dsout.to_netcdf(outname)
+
 #%% Do a visual comparison
 
 imon  = 1
