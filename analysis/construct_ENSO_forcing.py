@@ -140,9 +140,9 @@ flxs_detrended  = [proc.detrend_by_regression(inflxs[ii],ds_gmsst,regress_monthl
 # ==================================================
 
 # Indicate # of Modes
-nmode   = 2
-ensolag = 1 # Month to lag fluxes ahead of ENSO
-
+nmode       = 2
+ensolag     = 1 # Month to lag fluxes ahead of ENSO
+lag_bymonth = True
 
 rpattern_byflx = []
 ensocomp_byflx = []
@@ -156,7 +156,10 @@ for flx in flxs_detrended:
      
     
     # Preallocate
-    flx_enso = np.zeros((nmode,nyr-1,12,nlon,nlat)) * np.nan# Note, due to lag, drop first year...
+    if lag_bymonth:
+        flx_enso = np.zeros((nmode,nyr,12,nlon,nlat)) * np.nan# Don't drop first year if lagging in month..
+    else:
+        flx_enso = np.zeros((nmode,nyr-1,12,nlon,nlat)) * np.nan# Note, due to lag, drop first year...
     rpatterns = np.zeros((nmode,12,nlon,nlat)) * np.nan
     for N in range(nmode):
         
@@ -165,10 +168,16 @@ for flx in flxs_detrended:
         
         for im in tqdm(range(12)):
             
-            pcmon = pcin.isel(month=im).data[:(nyr-ensolag)]
-            flxin = flxrs[:,:,ensolag:,im]
+            if lag_bymonth:
+                im_minus_1 = im - ensolag
+                
+                pcmon      = pcin.isel(month=im_minus_1).data
+                flxin      = flxrs[:,:,:,im]
+            else: # Apply ENSO Lag to the Year Dimension
+                pcmon = pcin.isel(month=im).data[:(nyr-ensolag)]
+                flxin = flxrs[:,:,ensolag:,im]
             
-            rout     = proc.regress2ts(flxin,pcmon,verbose=False)
+            rout     = proc.regress2ts(flxin,pcmon,verbose=True)
             rpatterns[N,im,:,:] = rout.copy()
             
             ensocomp = rout[None,:,:] * pcmon[:,None,None]
@@ -188,12 +197,18 @@ ds_ensocomps = []
 ds_rpatterns = []
 
 
-times_shift = flxa.time[(12*ensolag):]
+if lag_bymonth:
+    times_shift = flxa.time
+else:
+    times_shift = flxa.time[(12*ensolag):]
 
 for ii in range(2):
     
     ensocomp    = ensocomp_byflx[ii]
-    ensocomp    = ensocomp.reshape(nmode,(nyr-1)*12,nlon,nlat)
+    if lag_bymonth:
+        ensocomp    = ensocomp.reshape(nmode,(nyr)*12,nlon,nlat)
+    else:
+        ensocomp    = ensocomp.reshape(nmode,(nyr-1)*12,nlon,nlat)
     
     coords1     = dict(pc=np.arange(nmode)+1,time=times_shift,lon=flxa.lon,lat=flxa.lat)
     ds_ensocomp = xr.DataArray(ensocomp,coords=coords1,dims=coords1,name=flxnames[ii])
@@ -218,11 +233,14 @@ outpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/enso/"
 for ii in range(2):
     
     outname = "%sERA5_%s_ENSO_related_forcing_ensolag%i.nc" % (outpath,flxnames[ii],ensolag)
+    if lag_bymonth:
+        outname = proc.addstrtoext(outname,"_lagbymonth",adjust=-1)
     edict    = proc.make_encoding_dict(enso_flxes[flxnames[ii]])
     enso_flxes[flxnames[ii]].to_netcdf(outname,encoding=edict)
     
     outname = "%sERA5_%s_ENSO_related_pattern_ensolag%i.nc" % (outpath,flxnames[ii],ensolag)
     enso_patterns[flxnames[ii]].to_netcdf(outname,encoding=edict)
+    
     
 #%% Just Check how it looks like over the SPGNE
 
