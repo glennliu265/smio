@@ -69,12 +69,15 @@ proc.makedir(figpath)
 
 outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/enso/"
 ensolag  = 1
+lag_bymonth=True
 flxnames = ['qnet','Fprime']
 
 forcings = []
 for ii in range(2):
     
     outname = "%sERA5_%s_ENSO_related_forcing_ensolag%i.nc" % (outpath,flxnames[ii],ensolag)
+    if lag_bymonth:
+        outname = proc.addstrtoext(outname,"_lagbymonth",adjust=-1)
     ds = xr.open_dataset(outname)[flxnames[ii]].load()
     forcings.append(ds)
     
@@ -82,13 +85,13 @@ for ii in range(2):
 #%% Load Parameters, let's use the ones from the Draft 2 Run
 # Just need to extract h, lbd_a, and lbd_d...
 
-expname     =  "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL"
+expname     =  "SST_ORAS5_avg_GMSST_EOFmon_usevar"
 
 expparams   = {
     
     'varname'           : "SST",
-    'bbox_sim'          : [-80,0,30,65],
-    'nyrs'              : 45,
+    'bbox_sim'          :  [-40,-15,52,62],
+    'nyrs'              : 46,
     'runids'            : ["run00",],
     'runid_path'        : "SST_ENSO_qnet_pc1", # If not None, load a runid from another directory
     'Fprime'            : "ERA5_Fprime_QNET_timeseries_QNETgmsstMON_nroll0_NAtl_EOFFilt090_corrected_usevar.nc",
@@ -118,16 +121,92 @@ expparams   = {
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
     
-#%% Copie Below from Run SSS Basinwide
+#%% Copied Below from Run SSS Basinwide
 
+import os
+rem_module_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/03_Scripts/reemergence/"
+os.chdir(rem_module_path)
+
+# Indicate the Machine!
+machine = "Astraeus"
+
+# First Load the Parameter File
+sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict   = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+from amv import proc,viz
+import amv.loaders as dl
+import scm
+import amv.loaders as dl
+import yo_box as ybx
+
+# Set needed paths
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+# procpath    = pathdict['procpath']
+# figpath     = pathdict['figpath']
+# proc.makedir(figpath)
+
+
+#%%
+
+# Constants
+dt    = 3600*24*30 # Timestep [s]
+cp    = 3850       # 
+rho   = 1026       # Density [kg/m3]
+B     = 0.2        # Bowen Ratio, from Frankignoul et al 1998
+L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
+
+debug = False
+
+
+
+#%% Check and Load Params
+
+print("\tLoading inputs for %s" % expname)
+
+# Apply patch to expdict
+expparams = scm.patch_expparams(expparams)
+
+# First, Check if there is EOF-based forcing (remove this if I eventually redo it)
+if expparams['eof_forcing']:
+    print("\t\tEOF Forcing Detected.")
+    eof_flag = True
+else:
+    print("\t\tEOF Forcing will not be used.")
+    eof_flag = False
+    
+# For correction factor, check to see if "usevar" is in the forcing name
+if eof_flag:
+    if 'usevar' in expparams['Fprime']:
+        usevar = True
+        print("Using variance for white noise forcing...")
+    else:
+        usevar = False
+inputs,inputs_ds,inputs_type,params_vv = scm.load_params(expparams,input_path)
+
+
+if usevar:
+    inputs['correction_factor']    = np.sqrt(inputs['correction_factor'])
+    inputs_ds['correction_factor'] = np.sqrt(inputs_ds['correction_factor'])
+
+
+#%%
 
 # Load out some parameters
 runids = expparams['runids']
 nruns  = len(runids)
 
-froll = expparams['froll']
-droll = expparams['droll']
-mroll = expparams['mroll']
+froll  = expparams['froll']
+droll  = expparams['droll']
+mroll  = expparams['mroll']
 
 # Make a function to simplify rolling
 def roll_input(invar,rollback,halfmode=False,axis=0):
@@ -137,289 +216,145 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
     return rollvar
 
 
-def qfactor_noisemaker(expparams,expdir,expname,runid,share_noise=False):
-    # Checks for separate wn timeseries for each correction factor
-    # and loads the dictionary
-    # If share noise is true, the same wn timeseries is used for:
-    #     - Fprime and Evaporation
-    #     - Qek forcing
-    #     - Precipe
-    
-    # Makes (and checks for) additional white noise timeseries for the following (6) correction factors
-    forcing_names = ("correction_factor",           # Fprime
-                     "correction_factor_Qek_SST",   # Qek_SST
-                     "correction_factor_evap",      # Evaporation
-                     "correction_factor_prec",      # Precip
-                     "correction_factor_Qek_SSS",   # Qek_SSS
-                     )
-    nforcings     = len(forcing_names)
-    
-    # Check for correction file
-    noisefile_corr = "%sInput/whitenoise_%s_%s_corrections.npz" % (expdir,expname,runid)
-    
-    # Generate or reload white noise
-    if len(glob.glob(noisefile_corr)) > 0:
-        
-        print("\t\tWhite Noise correction factor file has been found! Loading...")
-        wn_corr = np.load(noisefile_corr)
-        
-        if share_noise:
-            print("Checking for shared noise...")
-            if wn_corr['correction_factor'] != wn_corr['correction_factor_evap']:
-                print("\tSetting F' and E' white noise to be the same")
-                wn_corr['correction_factor_evap'] = wn_corr['correction_factor']
-            if wn_corr['correction_factor_Qek_SSS'] != wn_corr['correction_factor_Qek_SST']:
-                print("\tSetting Qek white noise to be the same")
-                wn_corr['correction_factor_Qek_SSS'] = wn_corr['correction_factor_Qek_SST']
-                
-        
-    else:
-        
-        print("\t\tGenerating %i new white noise timeseries: %s" % (nforcings,noisefile_corr))
-        noise_size  = [expparams['nyrs'],12,]
-        
-        wn_corr_out = {}
-        for nn in range(nforcings):
-            
-            if (forcing_names[nn] == "correction_factor_evap") and share_noise:
-                print("Copying same white noise timeseries as F' for E'")
-                wn_corr_out[forcing_names[nn]] = wn_corr_out['correction_factor']
-            elif (forcing_names[nn] == "correction_factor_Qek_SSS") and share_noise:
-                print("Copying same white noise timeseries as Qek SST for Qek SSS")
-                wn_corr_out[forcing_names[nn]] = wn_corr_out['correction_factor_Qek_SST']
-            else: # Make a new noise timeseries
-                wn_corr_out[forcing_names[nn]] = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
-        
-        np.savez(noisefile_corr,**wn_corr_out,allow_pickle=True)
-        wn_corr = wn_corr_out.copy()
-        
-    return wn_corr
 
-#%%  
-for nr in range(nruns):
+# Apply roll/shift to seasonal cycle
+ninputs = len(inputs)
+for ni in range(ninputs):
     
-    #%% Prepare White Noise timeseries ----------------------------------------
-    runid = runids[nr]
-    print("\tPreparing forcing...")
+    pname = list(inputs.keys())[ni]
+    ptype = inputs_type[pname]
     
-    # Check if specific path was indicated, and set filename accordingly
-    if expparams['runid_path'] is None:
-        noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
+    if ptype == "mld":
+        rollback = mroll
+    elif ptype == "forcing":
+        rollback = froll
+    elif ptype == "damping":
+        rollback = droll
     else:
-        expname_runid = expparams['runid_path'] # Name of experiment to take runid from
-        print("\t\tSearching for runid path in specified experiment folder: %s" % expname_runid)
-        noisefile     = "%sInput/whitenoise_%s_%s.npy" % (output_path + expname_runid + "/",expname_runid,runid)
+        print("Warning, Parameter Type not Identified. No roll performed.")
+        rollback = 0
     
-    # Generate or reload white noise
-    if len(glob.glob(noisefile)) > 0:
-        print("\t\tWhite Noise file has been found! Loading...")
-        wn = np.load(noisefile)
-    else:
-        print("\t\tGenerating new white noise file: %s" % noisefile)
-        noise_size = [expparams['nyrs'],12,]
-        if eof_flag: # Generate white noise for each mode
-            if expparams['qfactor_sep'] is False:
-                nmodes_plus1 = nmode + 1 # Directly include white noise timeseries
-            else:
-                nmodes_plus1 = nmode # Just use separate timeseries for each correction factor loaded through the helper
-            print("\t\tDetected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
-            noise_size   = noise_size + [nmodes_plus1]
+    if rollback != 0:
+        print("Rolling %s back by %i" % (pname,rollback))
         
-        wn = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
-        np.save(noisefile,wn)
-    
-    # Check if separate white noise timeseries should be loaded using the helper function
-    if expparams['qfactor_sep']:
-        wn_corr = qfactor_noisemaker(expparams,expdir,expname,runid,share_noise=expparams['share_noise'])
-    
-    #%% Do Conversions for Model Run ------------------------------------------
-    
-    if nr == 0: # Only perform this once
-        
-        # Apply roll/shift to seasonal cycle
-        ninputs = len(inputs)
-        for ni in range(ninputs):
-            
-            pname = list(inputs.keys())[ni]
-            ptype = inputs_type[pname]
-            
-            if ptype == "mld":
-                rollback = mroll
-            elif ptype == "forcing":
-                rollback = froll
-            elif ptype == "damping":
-                rollback = droll
-            else:
-                print("Warning, Parameter Type not Identified. No roll performed.")
-                rollback = 0
-            
-            if rollback != 0:
-                print("Rolling %s back by %i" % (pname,rollback))
-                
-                if eof_flag and len(inputs[pname].shape) > 3:
-                    rollaxis=1 # Switch to 1st dim to avoid mode dimension
-                else:
-                    rollaxis=0
-                inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
-        
-        # # Do Unit Conversions ---
-        inputs_convert  = scm.convert_inputs(expparams,inputs,dt=dt,rho=rho,L=L,cp=cp,return_sep=True)
-        alpha    = inputs_convert['alpha'] # Amplitude of the forcing
-        Dconvert = inputs_convert['lbd_a'] # Converted Damping
-        # # End Unit Conversion ---
-        
-        # Tile Forcing (need to move time dimension to the back)
-        if eof_flag and expparams['qfactor_sep'] is False: # Append Qfactor as an extra mode (old approach)
-            Qfactor = inputs_convert['Qfactor']
-            alpha   = np.concatenate([alpha,Qfactor[None,...]],axis=0)
-        
-        # Calculate beta and kprev
-        beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
-        if expparams['kprev'] is None and expparams['entrain'] == True: # Compute Kprev if it is not supplied
-            
-            print("Recalculating Kprev")
-            kprev = np.zeros((12,nlat,nlon))
-            for o in range(nlon):
-                for a in range(nlat):
-                    kprevpt,_=scm.find_kprev(inputs['h'][:,a,o])
-                    kprev[:,a,o] = kprevpt.copy()
-            inputs['kprev'] = kprev
-    
-        
-        # Set parameters, and transpose to [lon x lat x mon] for old script
-        smconfig = {}
-        
-        smconfig['h']       = inputs['h'].transpose(2,1,0)           # Mixed Layer Depth in Meters [Lon x Lat x Mon]
-        smconfig['lbd_a']   = Dconvert.transpose(2,1,0) # 
-        smconfig['beta']    = beta # Entrainment Damping [1/mon]
-        smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
-        smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
-        smconfig['Td_corr'] = expparams['Td_corr']
-        
-        
-    # Use different white noise for each runid
-    # wn_tile = wn.reshape()
-    stfrc = time.time()
-    if eof_flag:
-        # if usevar: # Take the squareroot for white noise combining
-        #     alpha = alpha#np.sqrt(np.abs(alpha)) * np.sign(alpha)
-        
-        if expparams['qfactor_sep']:
-            nmode_final = alpha.shape[0]
-            if wn.shape[2] != nmode_final:
-                print("Dropping last mode, using separate correction timeseries...")
-                wn = wn[:,:,:nmode_final]
-            
-            # Transpose and make the eof forcing
-            forcing_eof = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
-            
-            # Prepare the correction
-            qfactors = [qfz for qfz in list(inputs_convert.keys()) if "correction_factor" in qfz]
-            
-            qftotal  = []
-            for qfz in range(len(qfactors)): # Make timseries for each white noise correction
-                qfname      = qfactors[qfz]
-                qfactor     = inputs_convert[qfname] # [Mon x Lat x Lon]
-                if "Qek" in qfname:
-                    qfname = "%s_%s" % (qfname,expparams['varname'])
-                wn_qf       = wn_corr[qfname] # [Year x Mon]
-                
-                # if usevar:
-                #     qfactor = qfactor#np.sqrt(np.abs(qfactor)) * np.sign(qfactor)
-                
-                qf_combine  = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
-                
-                qftotal.append(qf_combine.copy())
-            qftotal = np.array(qftotal) # [Mode x Year x Mon x Lat x Lon]
-            
-            print(forcing_eof.shape)
-            print(qftotal.shape)
-            forcing_in = np.concatenate([forcing_eof,qftotal],axis=0)
-            
+        if eof_flag and len(inputs[pname].shape) > 3:
+            rollaxis=1 # Switch to 1st dim to avoid mode dimension
         else:
-            forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
-        forcing_in = np.nansum(forcing_in,0) # Sum over modes
-        
-    else:
-        forcing_in  = wn[:,:,None,None] * alpha[None,:,:,:] # [Year x Mon]
-    nyr,_,nlat,nlon = forcing_in.shape
-    forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
-    smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
-    print("\tPrepared forcing in %.2fs" % (time.time()-stfrc))
+            rollaxis=0
+        inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
+
+# # Do Unit Conversions ---
+inputs_convert  = scm.convert_inputs(expparams,inputs,dt=dt,rho=rho,L=L,cp=cp,return_sep=True)
+alpha           = inputs_convert['alpha'] # Amplitude of the forcing
+Dconvert        = inputs_convert['lbd_a'] # Converted Damping
+
+
+#%%
+
+# Calculate beta and kprev
+
+beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
+nlon,nlat,_ = beta.shape
+if expparams['kprev'] is None and expparams['entrain'] == True: # Compute Kprev if it is not supplied
     
-    # New Section: Check for SST-Evaporation Feedback ------------------------
-    smconfig['add_F'] = None
-    if 'lbd_e' in expparams.keys() and expparams['varname'] == "SSS":
-        if expparams['lbd_e'] is not None: 
-            print("Adding SST-Evaporation Forcing on SSS!")
-            # Load lbd_e
-            lbd_e = xr.open_dataset(input_path + "forcing/" + expparams['lbd_e']).lbd_e.load() # [mon x lat x lon]
-            lbd_e = proc.sel_region_xr(lbd_e,bbox=expparams['bbox_sim'])
-            
-            # Convert [sec --> mon]
-            lbd_emon = lbd_e * dt
-            lbd_emon = lbd_emon.transpose('lon','lat','mon').values
-            
-            # Load temperature timeseries
-            assert expparams['Tforce'] is not None,"Experiment for SST timeseries [Tforce] must be specified"
-            sst_nc = "%s%s/Output/SST_runid%s.nc" % (output_path,expparams['Tforce'],runid)
-            sst_in = xr.open_dataset(sst_nc).SST.load()
-            
-            sst_in = sst_in.drop_duplicates('lon')
-            
-            sst_in = sst_in.transpose('lon','lat','time').values
-            
-            # Tile and combine
-            lbd_emon_tile     = np.tile(lbd_emon,nyr) #
-            lbdeT             = lbd_emon_tile * sst_in
-            smconfig['add_F'] = lbdeT
+    print("Recalculating Kprev")
+    kprev = np.zeros((12,nlat,nlon))
+    for o in range(nlon):
+        for a in range(nlat):
+            kprevpt,_=scm.find_kprev(inputs['h'][:,a,o])
+            kprev[:,a,o] = kprevpt.copy()
+    inputs['kprev'] = kprev
+
+
+#%%
+
+
+# Set parameters, and transpose to [lon x lat x mon] for old script
+smconfig = {}
+
+smconfig['h']       = inputs['h'].transpose(2,1,0)           # Mixed Layer Depth in Meters [Lon x Lat x Mon]
+smconfig['lbd_a']   = Dconvert.transpose(2,1,0) # 
+smconfig['beta']    = beta # Entrainment Damping [1/mon]
+smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
+smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
+smconfig['Td_corr'] = expparams['Td_corr']
+
+# 
+
+# No SST-Evaporation Feedback
+smconfig['add_F'] = None
     
-    if debug: #Just run at a point
-        ivnames = list(smconfig.keys())
-        #[print(smconfig[iv].shape) for iv in ivnames]
-        
-        
-        for iv in ivnames:
-            vtype = type(smconfig[iv])
-            if vtype == np.ndarray:
-                smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
-                
-        #[print(smconfig[iv].shape) for iv in ivnames]
-    #  ------------------------------------------------------------------------
+
+#%% Set up the Forcing
+
+# Convert the forcing
+#dt=3600*24*30,rho=1026,L=2.5e6,cp=3850
+forcings_input = []
+forcing_names  = ["PC1","PC2","PCsum"]
+vnames_out     = []
+for ii in range(2):
     
-    #continue
-    
-    #%% Integrate the model
-    if expparams['entrain'] is True:
-        
-        outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
-                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],add_F=smconfig['add_F'],
-                                        return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
-        
-    else:
-        
-        outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
+    flxname        = flxnames[ii]
+    #forcing_bytype = []
     
     
-    #% Save the output
-    if debug:
-        ts = outdict['T'].squeeze()
-        plt.plot(ts),plt.show()
-    else:
-        var_out  = outdict['T']
-        timedim  = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
-        cdict    = {
-            "time" : timedim,
-            "lat" : latr,
-            "lon" : lonr,
-            }
+    for nn in tqdm(range(3)):
         
-        da       = xr.DataArray(var_out.transpose(2,1,0),coords=cdict,dims=cdict,name=expparams['varname'])
-        edict    = {expparams['varname']:{"zlib":True}}
-        savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
-        da.to_netcdf(savename,encoding=edict)
+        # Read out Forcing
+        if nn < 2: # Select Mode of the forcing
+            forcing_sel = forcings[ii].isel(pc=nn).transpose('lon','lat','time')
+        else: # Sum the PCs
+            forcing_sel = forcings[ii].sum('pc').transpose('lon','lat','time')
+        
+        forcing_sel = proc.sel_region_xr(forcing_sel,expparams['bbox_sim'])
+        
+        # Reshape
+        nlon,nlat,ntime = forcing_sel.shape
+        nyr = int(ntime/12)
+        forcing_sel = forcing_sel.data.reshape(nlon,nlat,nyr,12)
+        
+        # Convert Units (assuming it is W/m2)
+        forcing_conv = forcing_sel / (rho*cp*inputs['h'].transpose(2,1,0)[:,:,None,:]) * dt
+        
+        forcing_conv = forcing_conv.reshape(nlon,nlat,ntime)
+        
+        forcings_input.append(forcing_conv)
+        
+        vnames_out.append("%s_%s" % (flxnames[ii],forcing_names[nn]))
         
 
 
+#%% Run Simulation  
+
+simulation_output = []
+for jj in range(6):
+    
+    forcing_in          = forcings_input[jj]
+    smconfig['forcing'] = forcing_in
+    
+    outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
+                                    Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],add_F=smconfig['add_F'],
+                                    return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
+    
+    var_out  = outdict['T']
+    latr     = inputs_ds['h'].lat
+    lonr     = inputs_ds['h'].lon
+    timedim  = forcings[0].time #xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
+    cdict    = {
+        "time" : timedim,
+        "lat" : latr,
+        "lon" : lonr,
+        }
+    
+    
+    da       = xr.DataArray(var_out.transpose(2,1,0),coords=cdict,dims=cdict,name=expparams['varname'])
+    edict    = {expparams['varname']:{"zlib":True}}
+    
+    savename = "%sERA5_SST_ENSO_Component_%s.nc" % (outpath,vnames_out[jj])
+    
+    #savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
+    da.to_netcdf(savename,encoding=edict)
+    
+    
 
     
