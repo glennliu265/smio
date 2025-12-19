@@ -230,7 +230,7 @@ enso_flxes    = xr.merge(ds_ensocomps)
 
 outpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/enso/"
 
-for ii in range(2):
+for ii in tqdm(range(2)):
     
     outname = "%sERA5_%s_ENSO_related_forcing_ensolag%i.nc" % (outpath,flxnames[ii],ensolag)
     if lag_bymonth:
@@ -239,6 +239,8 @@ for ii in range(2):
     enso_flxes[flxnames[ii]].to_netcdf(outname,encoding=edict)
     
     outname = "%sERA5_%s_ENSO_related_pattern_ensolag%i.nc" % (outpath,flxnames[ii],ensolag)
+    if lag_bymonth:
+        outname = proc.addstrtoext(outname,"_lagbymonth",adjust=-1)
     enso_patterns[flxnames[ii]].to_netcdf(outname,encoding=edict)
     
     
