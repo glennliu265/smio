@@ -269,6 +269,37 @@ expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
 detect_blowup   = True
 
+# (12) Draft 3 Edition (using case with GMSST Mon Detrend)
+comparename     = "Draft03_FullHierachy"
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
+                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar",
+                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
+                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
+                   "SST_ERA5_1979_2024"]
+
+expnames_long   = ["Stochastic Model 0 (SOM)",
+                   "Stochastic Model 1 (Add seasonal MLD)",
+                   "Stochastic Model 2 (Add entrain damping)",
+                   "Stochastic Model 3 (Add entrain forcing)",
+                   "ERA5"]
+expnames_short  = ["SM_SOM",
+                   "SM_MLDvar",
+                   "SM_NoREM",
+                   "SM_REM",
+                   "ERA5"]
+expcols         = ["salmon",
+                   "darkviolet",
+                   "goldenrod",
+                   "turquoise",
+                   "k"]
+expls           = ['dotted',
+                   'dotted',
+                   'dashed',
+                   'dashed',
+                   'solid',
+                   'solid']
+detect_blowup   = True
+
 
 
 #%% Load information for each region
@@ -352,6 +383,10 @@ stds     = np.array([ds.std('time').data.item() for ds in ssts_ds])
 ssts_lp  = [proc.lp_butter(ts,120,6) for ts in ssts_ds]
 stds_lp  = np.array([np.std(ds) for ds in ssts_lp])
 vratio   = (stds_lp  / stds) * 100
+
+# Calculate High Pass Filtered variance as well
+ssts_hp  = [ssts_ds[ii] - ssts_lp[ii] for ii in range(nexps)]
+stds_hp  = np.array([np.std(ds) for ds in ssts_hp])
 
 #%% Check Distribution of Anomalies
 
@@ -672,7 +707,7 @@ instd_lp        = stds_lp
 if label_vratio:
     xlabs           = ["%s\n%.2f" % (expnames_long[ii],vratio[ii])+"%" for ii in range(len(vratio))]
 else:
-    xlabs  = expnames_short
+    xlabs       = expnames_short
 fig,ax          = plt.subplots(1,1,constrained_layout=True,figsize=(6,6))
 
 braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar)
@@ -703,9 +738,9 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Plot the Monthly Variance
 
-fsz_legend=12
-
-fig,ax = viz.init_monplot(1,1,figsize=(8,4.5))
+fsz_legend= 12
+fsz_tick  = 18
+fig,ax = viz.init_monplot(1,1,figsize=(10,4.5))
 
 for ex in range(nexps):
     
@@ -715,7 +750,7 @@ for ex in range(nexps):
         
     plotvar = metrics_out['monvars'][ex]
     
-    ax.plot(mons3,plotvar,label=expnames_long[ex],c=col_in,lw=2.5,ls=expls[ex])
+    ax.plot(mons3,plotvar,label=expnames_long[ex],c=col_in,lw=3,ls=expls[ex])
 
 ax.set_ylim([-.2,.5])
 ax.set_ylabel("SST Variance [$\degree C^2$]",fontsize=fsz_axis)
