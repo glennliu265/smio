@@ -90,7 +90,7 @@ proc.makedir(outpathbb)
 # Indicate Other Paths
 procpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 smoutput_path   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20250523/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/202501/"
 proc.makedir(figpath)
 
 # Indicate Experiment and Comparison Name 
@@ -104,6 +104,14 @@ expls           = ["dotted","dashed",'solid']
 comparename     = "Draft02"
 expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
 expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","ERA5"]
+expnames_short  = ["SM","SM_REM","ERA5"]
+expcols         = ["goldenrod","turquoise","k"]
+expls           = ["dashed","dotted",'solid']
+detect_blowup   = True
+
+comparename     = "Draft03"
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
+expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","Observations (ERA5)"]
 expnames_short  = ["SM","SM_REM","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']
@@ -373,6 +381,8 @@ for ex in range(2):
 ax.legend()
 
 #%% Plot resulting timeseries
+# Note that this is for Draft 03
+# Index of this is np.int64(105085) to skip the above block
 
 remove_topright   = True
 label_actual_year = True
@@ -404,7 +414,8 @@ years_sm   = [str(t)[:4] for t in times_sm]
 
 # Plot SM
 ax = axs[1]
-ax.plot(ssts_arr[0][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[0],c=expcols[0])
+if comparename != "Draft03":
+    ax.plot(ssts_arr[0][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[0],c=expcols[0])
 ax.plot(ssts_arr[1][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[1],c=expcols[1])
 ax.legend(fontsize=fsz_legend)
 
@@ -430,6 +441,99 @@ if darkmode:
     figname = proc.addstrtoext(figname,"_darkmode")
     
 plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
+
+#%% Try Plotting Both Together (Draft 03 Paper Version!!)
+# Search Code: !!OverLap
+
+remove_topright   = True
+label_actual_year = True
+ylims             = [-2,2]
+ts_lw             = 2 # Timeseries Line Width
+
+imins_sel         = 0
+
+fsz_legend = 18
+fsz_ticks  = 18
+fsz_axis   = 22
+
+
+
+# Initialize Fig
+fig,ax1           = plt.subplots(1,1,constrained_layout=True,figsize=(14,4.5))
+
+
+# Plot Era
+ax = ax1
+l1 = ax.plot(era_sst,label=expnames_long[-1],c=dfcol,lw=ts_lw)
+era_lp  = proc.lp_butter(era_sst,120,6)
+
+if label_actual_year:
+    times_sm   = ssts_reg[0].time.data[imins[imins_sel]:imins[imins_sel]+ntime_era]
+else:
+    times_sm   = ssts_reg[0].time.data[:ntime_era]
+years_sm   = [str(t)[:4] for t in times_sm]
+
+# Plot SM
+ax2 = ax.twiny()
+ax  = ax2
+l2  = ax.plot(ssts_arr[1][imins[imins_sel]:imins[imins_sel]+ntime_era],label=expnames_long[1],c=expcols[1],lw=ts_lw)
+#ax.legend(fontsize=fsz_legend)
+
+# Set Legend
+ax1.legend([l1[0],l2[0]],
+           ['Observations (ERA5)','Stochastic Model (with Re-emergence)'],
+           loc = 'lower left',
+           fontsize=fsz_legend,ncol=2)
+
+# # Label Axes
+# for ax in axs:
+#     ax.legend(fontsize=fsz_legend)
+#     ax.set_xlim(xlims)
+#     ax.set_ylim(ylims)
+#     ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
+#     ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
+    
+#     if remove_topright:
+#         ax.spines[['right', 'top']].set_visible(False)
+
+# Set Xticks for ERA5
+ax = ax1
+ax.set_xticks(xplot[::plotint],labels=years[::plotint])
+ax.set_xlim([xplot[0],xplot[-1]])
+
+# Set Xticks for SM
+ax = ax2
+ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
+ax.set_xlim([xplot[0],xplot[-1]])
+
+
+# Set Y-axis Limits, add zero line
+ax1.set_ylim(ylims)
+ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
+
+# Set Labels for ERA5
+ax1.set_ylabel("SPGNE SST Anomaly [$\degree C$]",fontsize=fsz_axis)
+ax1.tick_params(labelsize=fsz_ticks)
+ax1.set_xlabel("Year (Observations)",fontsize=fsz_axis)
+
+# Adjust Axes 2 color and size for Stochastic Model
+ax2col = expcols[1]
+ax2.tick_params(labelsize=fsz_ticks,colors=ax2col)
+ax1.spines['top'].set_color(ax2col)
+ax2.set_xlabel("Stochastic Model Simulation Year",
+               fontsize=fsz_axis,color=ax2col)
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+
+figname = "%sSST_SM_ERA5_Timeseries_Comparison_%s_istart%05i_lpf%02i_Combine.png" % (figpath,comparename,imins[1],lpcutoff)
+if darkmode:
+    figname = proc.addstrtoext(figname,"_darkmode")
+    
+plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
+
+
+
 
 
 #%% Compute Metrics for each case
@@ -951,8 +1055,6 @@ ax.set_ylabel("F' Forcing [W/m$^2$]")
 
 # Plot Mixed-Layer Depth --- --- 
 ax = axs[2]
-
-
 
 # # Plot each point
 allvalues_h = []

@@ -1090,12 +1090,14 @@ figname = "%sSpectra_Smoothing_Test_ERA5.png" % (figpath)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
     
-#%% Bootstrapping the standard deviations
+#%% Bootstrapping the standard deviations and monthly variance
 
 mcstds      = []
 mcstds_lp   = []
 
-for ex in tqdm(range(3)):
+monstds_sample = []
+
+for ex in tqdm.tqdm(range(3)):
     stochmod_ts         = ssts[ex]
     
     ntime_era           = len(ssts[-1])
@@ -1104,9 +1106,12 @@ for ex in tqdm(range(3)):
     
     stochmod_samples_lp = [proc.lp_butter(ts,120,6) for ts in stochmod_samples]
     
+    # Reshape to mon x year then take standard deviation
+    monstd_mc = np.array(stochmod_samples).reshape(mciter,int(ntime_era/12),12).std(1)
     
     mcstds.append( np.nanstd(np.array(stochmod_samples),1) )
     mcstds_lp.append( np.nanstd(np.array(stochmod_samples_lp),1) )
+    monstds_sample.append(monstd_mc)
     
 
 #%% Check Distribution of Variance
@@ -1466,13 +1471,12 @@ ax33            = fig.add_subplot(gs[4:,:11]) # Spectra
 
 # --------------------------------- # Barplot
 
-ax              = ax11
-
-remove_topright = True
-expcols_bar     = np.array(expcols).copy()
-expcols_bar[-1] = 'gray'
-label_vratio    = False
-label_stds      = True
+ax               = ax11
+remove_topright  = True
+expcols_bar      = np.array(expcols).copy()
+expcols_bar[-1]  = 'gray'
+label_vratio     = False
+label_stds       = True
 
 fsz_axis         = 18
 fsz_ticks        = 16
@@ -1541,7 +1545,13 @@ viz.label_sp(1,alpha=0.15,ax=ax,fontsize=fsz_title,y=1.10,x=-.15,
 for ex in range(nexps):
     plotvar = monstds[ex]
     ax.plot(mons3,plotvar,label=expnames_long[ex],
-            color=expcols[ex],lw=2.5,ls=expls[ex],marker="o")
+            color=expcols[ex],lw=2.5,ls=expls[ex],marker="o",zorder=1)
+    
+    # Plot Confidence INterval
+    if ex < (nexps-1):
+        plotmc = monstds_sample[ex]
+        bnds   = np.quantile(plotmc,[0.025,0.95],axis=0)
+        ax.fill_between(mons3,bnds[0],bnds[1],color=expcols[ex],alpha=0.10,zorder=5)
 
 
 ax.set_ylabel("Monthly $\sigma(SST)$ [$\degree$C]",fontsize=fsz_axis)
