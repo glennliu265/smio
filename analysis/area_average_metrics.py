@@ -73,7 +73,6 @@ fsz_axis    = 20
 fsz_title   = 16
 
 rhocrit     = proc.ttest_rho(0.05, 2, 86)
-
 proj        = ccrs.PlateCarree()
 
 #%% Load some other things to plot
@@ -277,16 +276,27 @@ expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
                    "SST_ERA5_1979_2024"]
 
-expnames_long   = ["Stochastic Model 0 (SOM)",
-                   "Stochastic Model 1 (Add seasonal MLD)",
-                   "Stochastic Model 2 (Add entrain damping)",
-                   "Stochastic Model 3 (Add entrain forcing)",
-                   "ERA5"]
-expnames_short  = ["SM_SOM",
-                   "SM_MLDvar",
-                   "SM_NoREM",
-                   "SM_REM",
-                   "ERA5"]
+# expnames_long   = ["Stochastic Model 0 (SOM)",
+#                    "Stochastic Model 1 (Add seasonal MLD)",
+#                    "Stochastic Model 2 (Add entrain damping)",
+#                    "Stochastic Model 3 (Add entrain forcing)",
+#                    "ERA5"]
+# expnames_short  = ["SM_SOM",
+#                    "SM_MLDvar",
+#                    "SM_NoREM",
+#                    "SM_REM",
+#                    "ERA5"]
+
+expnames_long   = ["Level 1",
+                   "Leve 1.5 (Seasonal MLD only)"
+                   "Level 2 (Entrainment Damping)",
+                   "Level 3 (Entrainment Damping + Re-emergence)",
+                   "Observations (ERA5)"]
+expnames_short  = ["Level 1",
+                   "Level 1.5",
+                   "Level 2",
+                   "Level 3",
+                   "Obs."]
 expcols         = ["salmon",
                    "darkviolet",
                    "goldenrod",
@@ -299,31 +309,31 @@ expls           = ['dotted',
                    'solid',
                    'solid']
 
-# (13) Draft 3 Edition (Add SOM)
-comparename     = "Draft03_AddSOM"
-expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
-                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
-                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
-                   "SST_ERA5_1979_2024"]
+# # (13) Draft 3 Edition (Add SOM)
+# comparename     = "Draft03_AddSOM"
+# expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
+#                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
+#                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
+#                    "SST_ERA5_1979_2024"]
 
-expnames_long   = ["Level 1",
-                   "Level 2 (Entrainment Damping)",
-                   "Level 3 (Entrainment Damping + Re-emergence)",
-                   "Observations (ERA5)"]
-expnames_short  = ["Level 1",
-                   "Level 2",
-                   "Level 3",
-                   "Obs."]
-expcols         = ["salmon",
-                   "goldenrod",
-                   "turquoise",
-                   "k"]
-expls           = ['dotted',
-                   'dashed',
-                   'dashed',
-                   'solid']
+# expnames_long   = ["Level 1",
+#                    "Level 2 (Entrainment Damping)",
+#                    "Level 3 (Entrainment Damping + Re-emergence)",
+#                    "Observations (ERA5)"]
+# expnames_short  = ["Level 1",
+#                    "Level 2",
+#                    "Level 3",
+#                    "Obs."]
+# expcols         = ["salmon",
+#                    "goldenrod",
+#                    "turquoise",
+#                    "k"]
+# expls           = ['dotted',
+#                    'dashed',
+#                    'dashed',
+#                    'solid']
 
-detect_blowup   = True
+# detect_blowup   = True
 
 
 
@@ -422,7 +432,7 @@ kmonth  = None
 
 for kmonth in range(13):
     
-    if kmonth == 13:
+    if kmonth == 12:
         kmonth = None
     hbins   = np.arange(-2,2.1,0.1)
     fig,axs = plt.subplots(4,1,figsize=(6,10),constrained_layout=True)
@@ -1097,7 +1107,7 @@ mcstds_lp   = []
 
 monstds_sample = []
 
-for ex in tqdm.tqdm(range(3)):
+for ex in tqdm.tqdm(range(nexps-1)):
     stochmod_ts         = ssts[ex]
     
     ntime_era           = len(ssts[-1])
@@ -1109,6 +1119,7 @@ for ex in tqdm.tqdm(range(3)):
     # Reshape to mon x year then take standard deviation
     monstd_mc = np.array(stochmod_samples).reshape(mciter,int(ntime_era/12),12).std(1)
     
+    
     mcstds.append( np.nanstd(np.array(stochmod_samples),1) )
     mcstds_lp.append( np.nanstd(np.array(stochmod_samples_lp),1) )
     monstds_sample.append(monstd_mc)
@@ -1117,59 +1128,121 @@ for ex in tqdm.tqdm(range(3)):
 #%% Check Distribution of Variance
 
 bins    = np.arange(0,0.61,0.01)
-fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6))
 
-iilab = [0,2,1,3]
-ii    = 0
-for vv in range(2):
-    
-    if vv == 0: # Raw
-        mcstds_in = mcstds
-        stds_in    = stds
-        xlm       = [0.25,0.60]
-        xlab      = "$\sigma(SST)$"
-        
-    else:       # LP Filter
-        mcstds_in = mcstds_lp
-        stds_in   = stds_lp
-        xlm       = [0,0.50]
-        xlab      = "10-year LP Filtered $\sigma(SST)$"
-        
-    for ex in range(2):
-        
-        ax = axs[ex,vv]
-        ax.hist(mcstds_in[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
-        
-        bnds = np.quantile(mcstds_in[ex],[0.025,0.975])
-        mu   = np.nanmean(mcstds_in[ex])
-        
-        ax.axvline(stds_in[-1],color="k",label="ERA5 = %.2f" % stds_in[-1])
-        
-        ax.axvline(stds_in[ex],color="blue",label="$\mu$ (Full Timeseries) = %.2f" % stds_in[ex])
-        ax.axvline(mu,label="$\mu$ (Samples)= %.2f" % mu,ls='solid',color='gray')
-        ax.axvline(bnds[0],label="95%% Lower Bnd = %.2f" % bnds[0],ls='dashed',color="gray")
-        ax.axvline(bnds[1],label="95%% Upper Bnd = %.2f" % bnds[1],ls='dashed',color="gray")
-        
-        
-        
-        ax.set_xlim(xlm)
-        ax.set_ylim([0,25])
-        ax.legend()
-        
-        # csfit   = sp.stats.chi2.fit(mcstds[1])
-        # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
-        # ax.plot(bins,pdftheo)
-        if ex == 1:
-            ax.set_xlabel("%s [$\degree$ C]" % xlab)
-        
-        if vv == 0:
-            ax.set_ylabel("Frequency\n%s" % expnames_long[ex])
-    
-        viz.label_sp(iilab[ii],ax=ax,fig=fig)
-        ii += 1
+if "Draft03" in comparename: # Draft 3 Version
+    fig,axs = plt.subplots(3,2,constrained_layout=True,figsize=(10,6))
 
-figname = "%sMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+    iilab = [0,4,1,5,2,]
+    ii    = 0
+    for ex in range(3):
+        
+        for vv in range(2):
+            
+            if vv == 0: # Raw
+                mcstds_in = mcstds
+                stds_in   = stds
+                xlm       = [0.25,0.60]
+                xlab      = "$\sigma(SST)$"
+                
+            else:       # LP Filter
+                mcstds_in = mcstds_lp
+                stds_in   = stds_lp
+                xlm       = [0,0.50]
+                xlab      = "10-year LP Filtered $\sigma(SST)$"
+            
+        
+            
+            ax = axs[ex,vv]
+            
+            ax.hist(mcstds_in[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
+            
+            bnds = np.quantile(mcstds_in[ex],[0.025,0.975])
+            mu   = np.nanmean(mcstds_in[ex])
+            
+            ax.axvline(stds_in[-1],color="k",label="Obs. = %.2f" % stds_in[-1])
+            
+            
+            
+            ax.axvline(stds_in[ex],color="blue",label="$\mu$ (Full Timeseries) = %.2f" % stds_in[ex])
+            ax.axvline(mu,label="$\mu$ (Samples)= %.2f" % mu,ls='solid',color='gray')
+            cflab = r"95%% Bounds: [%.2f, %.2f]" % (bnds[0],bnds[1])
+            ax.axvline(bnds[0],label=cflab,ls='dashed',color="gray")
+            ax.axvline(bnds[1],label="",ls='dashed',color="gray")
+            
+            ax.set_xlim(xlm)
+            ax.set_ylim([0,25])
+            ax.legend()
+            
+            # csfit   = sp.stats.chi2.fit(mcstds[1])
+            # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
+            # ax.plot(bins,pdftheo)
+            if ex == 1:
+                ax.set_xlabel("%s [$\degree$ C]" % xlab)
+            
+            if vv == 0:
+                ax.set_ylabel("Frequency\n%s" % expnames_short[ex])
+        
+            viz.label_sp(ii,ax=ax,fig=fig)
+            ii += 1
+
+    figname = "%sMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+else:
+    fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,10))
+    
+    iilab = [0,2,1,3]
+    ii    = 0
+    for vv in range(2):
+        
+        if vv == 0: # Raw
+            mcstds_in = mcstds
+            stds_in    = stds
+            xlm       = [0.25,0.60]
+            xlab      = "$\sigma(SST)$"
+            
+        else:       # LP Filter
+            mcstds_in = mcstds_lp
+            stds_in   = stds_lp
+            xlm       = [0,0.50]
+            xlab      = "10-year LP Filtered $\sigma(SST)$"
+            
+        for ex in range(2):
+            
+            ax = axs[ex,vv]
+            ax.hist(mcstds_in[ex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
+            
+            bnds = np.quantile(mcstds_in[ex],[0.025,0.975])
+            mu   = np.nanmean(mcstds_in[ex])
+            
+            ax.axvline(stds_in[-1],color="k",label="ERA5 = %.2f" % stds_in[-1])
+            
+            ax.axvline(stds_in[ex],color="blue",label="$\mu$ (Full Timeseries) = %.2f" % stds_in[ex])
+            ax.axvline(mu,label="$\mu$ (Samples)= %.2f" % mu,ls='solid',color='gray')
+            cflab = r"95% Bounds: [%.2f, %.2f]" % (bnds[0],bnds[1])
+            ax.axvline(bnds[0],label=cflab,ls='dashed',color="gray")
+            ax.axvline(bnds[1],label="",ls='dashed',color="gray")
+
+            
+            
+            
+            ax.set_xlim(xlm)
+            ax.set_ylim([0,25])
+            ax.legend()
+            
+            # csfit   = sp.stats.chi2.fit(mcstds[1])
+            # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
+            # ax.plot(bins,pdftheo)
+            if ex == 1:
+                ax.set_xlabel("%s [$\degree$ C]" % xlab)
+            
+            if vv == 0:
+                ax.set_ylabel("Frequency\n%s" % expnames_long[ex])
+        
+            viz.label_sp(iilab[ii],ax=ax,fig=fig)
+            ii += 1
+    
+    figname = "%sMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 #%% Try getting confidence interval for ERA5
 
@@ -1459,8 +1532,9 @@ if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight')
 
+# ===============
 #%% Draft 3 Version, with Monthly Variance Added
-
+# ===============
 
 fig             = plt.figure(figsize=(14,10))
 gs              = gridspec.GridSpec(8,12)
@@ -1515,7 +1589,9 @@ if label_stds:
 colorsf = {'Raw':'gray','10-year Low-pass':'k',}         
 labels = list(colorsf.keys())
 handles = [plt.Rectangle((0,0),1,1, color=colorsf[label]) for label in labels]
-ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0)
+ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0,
+          bbox_to_anchor=(0.04, 0.82, 1., .102))
+
 #ax.legend()
 #ax.bar_label(vratio,fmt="%.2f",c=w,label_type='bottom')
 
