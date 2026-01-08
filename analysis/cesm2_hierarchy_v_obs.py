@@ -210,13 +210,15 @@ dsall_flx   = dscesms_flxs_proc + [flx_era,]
 
 expnames_short = ["SOM","PenOM","FCM","ERA5"]
 expnames_short_new = ["SOM","MCOM","FOM","ERA5"]
-expnames_long  = ["Slab Ocean Model (60-360)","Multi-Column Ocean Model (100-400)","Full Ocean Model (200-2000)","ERA5 (1979-2024)"]
+expnames_long_old  = ["Slab Ocean Model (60-360)","Multi-Column Ocean Model (100-400)","Full Ocean Model (200-2000)","ERA5 (1979-2024)"]
+
+expnames_long      = ["Slab Ocean Model (300 years)","Multi-Column Ocean Model (300 years)","Full Ocean Model (1800 years)","Observations (ERA5 1979-2024)"]
 
 nexps = len(expnames)
 expcols         = ['violet','forestgreen','cornflowerblue','k']
 expcols_bar     = ['violet','forestgreen','cornflowerblue','gray']
 
-
+expls = ["dotted",'dashed','solid','solid']
 #%% Select Regions and Take area averages
 
 lags        = np.arange(61)
@@ -370,9 +372,6 @@ mciter  = 10000
 ex      = 0
 pct     = 0.10
 
-
-
-
 cesm_conts      = []
 cesm_specdicts  = []
 for ex in range(3):
@@ -392,15 +391,23 @@ for ex in range(3):
 #%% Also Take samples of the variance
 # =============================================================================
     
-    
+
+
 stds        = stds_metrics[0][1]
 stds_lp     = stds_metrics[0][2]
 
+
+monstds_spgne =  [ ds.groupby('time.month').std('time') for ds in aavgs_byreg[0]]
+
+
 #def mcsample_spectra(ts,samplen,nsmooth):
 
-mcstds      = []
-mcstds_lp   = []
-for ex in range(3):
+mcstds         = []
+mcstds_lp      = []
+monstds_sample = []
+
+for ex in tqdm.tqdm(range(3)):
+    
     cesm_ts         = sstsin[ex]
     
     ntime_era       = len(ssts[-1])
@@ -410,8 +417,12 @@ for ex in range(3):
     cesm_samples_lp = [proc.lp_butter(ts,120,6) for ts in cesm_samples]
     
     
+    monstds_mc = mcdict['samples'].reshape(mciter,int(ntime_era/12),12).std(1)
+    
     mcstds.append( np.nanstd(np.array(cesm_samples),1) )
     mcstds_lp.append( np.nanstd(np.array(cesm_samples_lp),1) )
+    
+    monstds_sample.append(monstds_mc)
 
 #%% Setup for barplot
 
@@ -439,11 +450,8 @@ errbar_var_lp[1,:] = np.hstack([uppervar_lp,[None,]])
 #%% Make the Combined Barplot and Spectra for Paper Outline
 # ======================
 
-
 remove_topright = True
 add_errbar      = True
-
-
 
 rr              = 0
 metrics_out     = metrics_byreg[rr]
@@ -454,7 +462,6 @@ gs              = gridspec.GridSpec(4,12)
 # --------------------------------- # Barplot
 ax11            = fig.add_subplot(gs[:,:3],)
 ax              = ax11
-
 
 fsz_axis        = 18
 fsz_ticks       = 16
@@ -607,6 +614,215 @@ figname = "%s%s_NASST_Spectra_Barplot.png" % (figpath,bbnames[rr])
 if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,transparent=transparent,bbox_inches='tight',dpi=150)
+
+#%%  Draft 03 Version with Monthly Variance Case
+
+fig             = plt.figure(figsize=(14,10))
+gs              = gridspec.GridSpec(8,12)
+
+ax11            = fig.add_subplot(gs[:3,:3],) # Barplot
+ax22            = fig.add_subplot(gs[:3,4:11])  # Month Std
+ax33            = fig.add_subplot(gs[4:,:11]) # Spectra
+
+
+remove_topright = True
+add_errbar      = True
+rr              = 0
+metrics_out     = metrics_byreg[rr]
+
+# --------------------------------- # Barplot
+ax              = ax11
+
+fsz_axis        = 18
+fsz_ticks       = 16
+fsz_title       = 26
+fsz_legend      = 14
+label_ratio     = False
+
+instd           = stds_metrics[rr][1]
+instd_lp        = stds_metrics[rr][2]
+vratio          = stds_metrics[rr][3]
+if label_ratio:
+    xlabs           = ["%s\n%.2f" % (expnames_short[ii],vratio[ii])+"%" for ii in range(len(vratio))]
+else:
+    xlabs           = expnames_short_new
+
+if add_errbar:
+    braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=errbar_var,
+                              error_kw=dict(ecolor='darkgray',
+                                            barsabove=True,
+                                            capsize=5,marker="o",markersize=25,mfc='None',
+                                            ))
+    blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_lp,
+                              error_kw=dict(ecolor='w',
+                                            barsabove=True,
+                                            capsize=5,marker="o",markersize=25,mfc='None',
+                                            ))
+else:
+    braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,)
+    blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,)
+
+ax.bar_label(braw,fmt="%.02f",c='gray',fontsize=fsz_ticks)
+ax.bar_label(blp,fmt="%.02f",c=dfcol,fontsize=fsz_ticks)
+
+ax.set_xticks(np.arange(nexps),labels=xlabs,rotation=45)
+ax.set_ylabel("$\sigma$(SST) [$\degree$C]",fontsize=fsz_axis)
+ax.set_ylim([0,1.25])
+
+ax.tick_params(labelsize=fsz_ticks)
+
+viz.label_sp(0,alpha=0.15,ax=ax,fontsize=fsz_title,y=1.17,x=-.40,
+             fontcolor=dfcol)
+
+colorsf = {'Raw':'gray','10-year Low-pass':'k',}         
+labels = list(colorsf.keys())
+handles = [plt.Rectangle((0,0),1,1, color=colorsf[label]) for label in labels]
+ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0,
+          bbox_to_anchor=(0.04, 0.82, 1., .102))
+
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+    
+    
+# --------------------------------- # Monthly Variance
+
+ax         = ax22
+mons3      = proc.get_monstr()
+
+viz.label_sp(1,alpha=0.15,ax=ax,fontsize=fsz_title,y=1.17,x=-.15,
+             fontcolor=dfcol)
+
+
+for ex in range(nexps):
+    plotvar = monstds_spgne[ex]
+    ax.plot(mons3,plotvar,label=expnames_long[ex],ls=expls[ex],
+            color=expcols[ex],lw=2.5,marker="o",zorder=1)
+    
+    # Plot Confidence INterval
+    if ex < (nexps-1):
+        plotmc = monstds_sample[ex]
+        bnds   = np.quantile(plotmc,[0.025,0.95],axis=0)
+        ax.fill_between(mons3,bnds[0],bnds[1],color=expcols[ex],alpha=0.10,zorder=5)
+
+
+ax.set_ylabel("Monthly $\sigma(SST)$ [$\degree$C]",fontsize=fsz_axis)
+#ax.set_xticks(np.arange(1,13))
+ax.set_xticklabels(mons3)
+ax.set_xlim([0,11])
+#ax.set_ylim([0,0.75])
+
+
+ax.set_ylim([0.2,1])
+ax.set_yticks(np.arange(0,1.2,.2))
+ax.set_yticks(np.arange(0.2,0.81,0.2))
+ax.tick_params(labelsize=fsz_ticks)
+
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+
+    
+# --------------------------------- # Power Spectra
+
+obs_cutoff = 10 # in years
+obs_cutoff = 1/(obs_cutoff*12)
+
+ax         = ax33
+
+decadal_focus = False
+if decadal_focus:
+    xper            = np.array([20,10,5,1,0.5])
+else:
+    xper            = np.array([40,10,5,1,0.5])
+
+xper_ticks      = 1 / (xper*12)
+dtmon_fix       = 60*60*24*30
+
+for ii in range(nexps):
+    plotspec        = metrics_out['specs'][ii] / dtmon_fix
+    plotfreq        = metrics_out['freqs'][ii] * dtmon_fix
+    CCs             = metrics_out['CCs'][ii] / dtmon_fix
+    
+    color_in = expcols[ii]
+    if color_in == "k" and darkmode:
+        color_in = dfcol
+    
+    if ii == 3:
+        
+        iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
+        ax.loglog(plotfreq,plotspec,label="",c=color_in,ls='dashed',lw=1.5)
+        plotfreqhi     = plotfreq[iplot_hifreq]
+        plotspechi     = plotspec[iplot_hifreq]
+        
+        ax.loglog(plotfreqhi,plotspechi,lw=4,label=expnames_long[ii],c=color_in)
+        
+    else:
+        
+        ax.loglog(plotfreq,plotspec,lw=4,label=expnames_long[ii],c=color_in)
+        
+        
+    
+    # Plot the 95% Confidence Interval (for stochastic model output)
+    if ii < 3:
+        
+        plotspec1 = cesm_specdicts[ii]['specs'] / dtmon_fix
+        plotfreq1 = cesm_specdicts[ii]['freqs'][0,:] * dtmon_fix
+        bnds      = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
+        ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
+        
+    else: # plot for ERA5
+        
+        # Plot Confidence Interval (ERA5)
+        alpha           = 0.05
+        cloc_era        = [2e-2,6]
+        dof_era         = metrics_out['dofs'][-1]
+        cbnds_era       = proc.calc_confspec(alpha,dof_era)
+        ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
+        
+    
+    #ax.loglog(plotfreq,CCs[:,0],ls='dotted',lw=0.5,c=expcols[ii])
+    #ax.loglog(plotfreq,CCs[:,1],ls='dashed',lw=0.9,c=expcols[ii])
+
+ax.set_xlim([xper_ticks[0],0.5])
+ax.axvline([1/(6)],label="",ls='dotted',c='gray')
+ax.axvline([1/(12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(5*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
+ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
+
+ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
+ax.set_ylabel("Power [$\degree C ^2 / cycle \, per \, mon$]",fontsize=fsz_axis)
+
+ax2 = ax.twiny()
+ax2.set_xlim([xper_ticks[0],0.5])
+ax2.set_xscale('log')
+ax2.set_xticks(xper_ticks,labels=xper,fontsize=fsz_ticks)
+ax2.set_xlabel("Period (Years)",fontsize=fsz_ticks)
+
+# # Plot Confidence Interval (ERA5)
+# alpha           = 0.05
+# cloc_era        = [8e-2,1e-2]
+# dof_era         = metrics_out['dofs'][-1]
+# cbnds_era       = proc.calc_confspec(alpha,dof_era)
+# proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence") #+r" (dof= %.2f)" % dof_era)
+
+ax.set_ylim(ylim)
+
+ax.legend(fontsize=fsz_legend,framealpha=0.5,edgecolor='none',)
+
+for ax in [ax,ax2]:
+    ax.tick_params(labelsize=fsz_ticks)
+    
+viz.label_sp(2,alpha=0.15,ax=ax,fontsize=fsz_title,y=1.17,x=-.1,
+             fontcolor=dfcol)
+
+figname = "%s%s_NASST_Spectra_Barplot_Draft03version.png" % (figpath,bbnames[rr])
+if darkmode:
+    figname = proc.darkname(figname)
+plt.savefig(figname,transparent=transparent,bbox_inches='tight',dpi=150)
+
 
 #%% Investigate Flx-SST Lag Relationship
 rr          = 0
@@ -956,6 +1172,8 @@ for aa in range(2):
 
 rr            = 1
 plot_variance = True
+
+
 
 monvars       =  [ ds.groupby('time.month').var('time') for ds in aavgs_byreg[rr]]
 monstds       =  [ ds.groupby('time.month').std('time') for ds in aavgs_byreg[rr]]
