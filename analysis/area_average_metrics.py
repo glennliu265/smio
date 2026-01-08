@@ -288,7 +288,7 @@ expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
 #                    "ERA5"]
 
 expnames_long   = ["Level 1",
-                   "Leve 1.5 (Seasonal MLD only)"
+                   "Leve 1.5 (Seasonal MLD only)",
                    "Level 2 (Entrainment Damping)",
                    "Level 3 (Entrainment Damping + Re-emergence)",
                    "Observations (ERA5)"]

@@ -111,7 +111,7 @@ detect_blowup   = True
 
 comparename     = "Draft03"
 expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL","SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL","SST_ERA5_1979_2024"]
-expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with re-emergence)","Observations (ERA5)"]
+expnames_long   = ["Stochastic Model (no re-emergence)","Stochastic Model (with Re-emergence)","Observations (ERA5)"]
 expnames_short  = ["SM","SM_REM","ERA5"]
 expcols         = ["goldenrod","turquoise","k"]
 expls           = ["dashed","dotted",'solid']

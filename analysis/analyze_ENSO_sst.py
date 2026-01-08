@@ -559,8 +559,8 @@ for a,ax in enumerate(axs):
         CCs             = specout_sstresp_pa['CCs'][ii] / dtmon_fix
         
 
-        color_in = speccols[ii]
-        label    = forcing_names[ii] 
+        color_in = speccols[jj]
+        label    = forcing_names[jj+1] 
         ls = 'dashed'
         
         ax.loglog(plotfreq,plotspec,lw=4,label=label,c=color_in,ls=ls)
