@@ -71,11 +71,14 @@ smoutput = True # Set to True for stochastic model output
 
 outformat = "%s%s_%s_%04d_%04d_%s.nc"
 
+
 # If smoutput is <True>... ----------------------------------------------------
 # Use sm loader and output path to metrics folder
-expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
-vname       = "SST"
-concat_dim  = "time"
+expname            ="SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar" #"SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
+vname              = "SST"
+concat_dim         = "time"
+detect_blowup      = True
+blowup_thres       = 1e2
 
 if smoutput:
     sm_output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
@@ -157,13 +160,28 @@ print(nclist)
 
 #%% Loop for each file
 
-aavgs  = []
-nfiles = len(nclist)
+aavgs    = []
+if detect_blowup:
+    masks    = []
+    stds     = []
+nfiles   = len(nclist)
 for ff in tqdm.tqdm(range(nfiles)):
     
-    ncname = nclist[ff]
-    ds     = xr.open_dataset(ncname)
+    ncname        = nclist[ff]
+    ds            = xr.open_dataset(ncname)
     
+    
+    if detect_blowup:
+        dsstd       = ds.std('time')
+        blowup_mask = xr.where(dsstd.SST > blowup_thres,np.nan,1) 
+        ds          = ds * blowup_mask
+        
+        masks.append(blowup_mask)
+        stds.append(dsstd)
+        
+        
+        
+        
     if 'lon' in ds.coords:
         ds     = proc.lon360to180_xr(ds)
         dsreg  = proc.sel_region_xr(ds,bbsel)[vname].load()
@@ -202,4 +220,21 @@ else:
 edict = proc.make_encoding_dict(da_out)
 da_out.to_netcdf(outname,encoding=edict)
 print("File saved to %s" % outname)
+
+# Also Save Blowup Mask
+if detect_blowup:
+    # Force Concat by ens (really runID)
+    if len(nclist) > 1:
+        masks   = xr.concat(masks,dim='ens')
+        stds    = [d.SST for d in stds]
+        stds    = xr.concat(stds,dim='ens')
+    else:
+        masks = masks[0]
+        stds  = stds[0]
+    ds_out  = xr.merge([masks.rename('mask'),stds.rename('stdev')])
+    outname_mask = proc.addstrtoext(outname,"_blowup_masks",adjust=-1)
+    ds_out.to_netcdf(outname_mask)
+    
+    
+
 
