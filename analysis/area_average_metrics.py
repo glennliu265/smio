@@ -110,7 +110,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20251106/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260219/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 proc.makedir(figpath)
 
@@ -287,7 +287,7 @@ expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
 #                    "SM_REM",
 #                    "ERA5"]
 
-expnames_long   = ["Level 1",
+expnames_long   = ["Level 1 (SOM)",
                    "Leve 1.5 (Seasonal MLD only)",
                    "Level 2 (Entrainment Damping)",
                    "Level 3 (Entrainment Damping + Re-emergence)",
@@ -309,14 +309,14 @@ expls           = ['dotted',
                    'solid',
                    'solid']
 
-# # (13) Draft 3 Edition (Add SOM)
+# # (13) Draft 3/4 Edition (Add SOM)
 # comparename     = "Draft03_AddSOM"
 # expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
 #                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
 #                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
 #                    "SST_ERA5_1979_2024"]
 
-# expnames_long   = ["Level 1",
+# expnames_long   = ["Level 1 (SOM)",
 #                    "Level 2 (Entrainment Damping)",
 #                    "Level 3 (Entrainment Damping + Re-emergence)",
 #                    "Observations (ERA5)"]
@@ -333,7 +333,7 @@ expls           = ['dotted',
 #                    'dashed',
 #                    'solid']
 
-# detect_blowup   = True
+detect_blowup   = True
 
 
 
@@ -547,12 +547,15 @@ for kmonth in range(12):
     
 #%% Plot ACF minigrid
 
+alpha = 0.001
+
 plot_im  = np.roll(np.arange(12),1)
 fig,axs = plt.subplots(4,3,constrained_layout=True,figsize=(10,8))
 
 alphalist = list(map(chr, range(97, 123)))
 alphalist_upper = [s.upper() for s in alphalist]
 
+handles = [] # For legend
 for mm in range(12):
     
     ax     = axs.flatten()[mm]
@@ -571,7 +574,8 @@ for mm in range(12):
             col_in = expcols[ex]
         
         plotvar = metrics_out['acfs'][kmonth][ex]
-        ax.plot(lags,plotvar,
+        
+        lll = ax.plot(lags,plotvar,
                 label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5)
         # Calcualate Confidence Interval
         if use_neff:
@@ -587,8 +591,10 @@ for mm in range(12):
             else:
                 alpha = 0.05
         else:
-            alpha = 0.15
+            alpha = 0.10
         ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
+        if mm == 0:
+            handles.append(lll[0]) # Need to take first element of list for handle
         
     # =========================================================================
     
@@ -597,12 +603,12 @@ for mm in range(12):
     ax.set_xticks(np.arange(0,66,6))
     ax.set_yticks(np.arange(0,1.25,0.25))
     ax.axhline([0],ls='dashed',c='k',lw=0.55)
-    if mm == 0:
-        ax.legend(fontsize=7,framealpha=.0)
-    
-    
+
+
+fig.legend(handles,expnames_long,bbox_to_anchor=(0.5, 1.05),loc ='center',ncol=4)
+
 figname = "%sACF_%s_neff%i_AllMonths.png" % (figpath,comparename,use_neff)
-plt.savefig(figname,dpi=150,transparent=transparent) 
+plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight') 
 
 #%%
 #viz.add_ylabel("Correlation",ax=ax)#%% Plot Effective DOF
@@ -777,7 +783,6 @@ if darkmode:
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Make Barplot with high pass comparison
-
 
 # Abandoned project ot make grouped barplot
 import pandas as pd
@@ -973,6 +978,7 @@ ax.set_title("Monthly E-Folding Timescale (5-year fit)")
 # =============================================================================
 #%% Bootstrap Spectra
 # =============================================================================
+# <SMIO PLOT RUN> -- Run this block for plotting
 # Based on tomoki's suggestion, try bootstrapping 
 
 nsmooth = 4
@@ -1102,6 +1108,8 @@ plt.savefig(figname,dpi=150,bbox_inches='tight')
     
 #%% Bootstrapping the standard deviations and monthly variance
 
+# <SMIO PLOT RUN> -- Run this block for plotting
+
 mcstds      = []
 mcstds_lp   = []
 
@@ -1127,11 +1135,13 @@ for ex in tqdm.tqdm(range(nexps-1)):
 
 #%% Check Distribution of Variance
 
+
 bins    = np.arange(0,0.61,0.01)
 
 if "Draft03" in comparename: # Draft 3 Version
+    
     fig,axs = plt.subplots(3,2,constrained_layout=True,figsize=(10,6))
-
+    
     iilab = [0,4,1,5,2,]
     ii    = 0
     for ex in range(3):
@@ -1246,6 +1256,8 @@ else:
 
 #%% Try getting confidence interval for ERA5
 
+# <SMIO PLOT RUN> -- Run this block for plotting
+
 ntime_era       = len(ssts[-1])
 n_eff           = proc.calc_dof(ssts[-1],) # calculate effective dof
 
@@ -1269,6 +1281,7 @@ upperbnd_era5 = np.sqrt(upper)
 
 #%% Setup for barplot
 
+# <SMIO PLOT RUN> -- Run this block for plotting
 errbar_var      = np.zeros((2,nexps))
 errbar_var_lp   = np.zeros((2,nexps))
 
@@ -1385,6 +1398,7 @@ expcols_bar     = np.array(expcols).copy()
 expcols_bar[-1] = 'gray'
 label_vratio    = False
 label_stds      = True
+flip_barorder   = True
 
 fsz_axis         = 18
 fsz_ticks        = 16
@@ -1448,6 +1462,7 @@ ax         = ax22
 decadal_focus = True
 obs_cutoff = 10 # in years
 obs_cutoff = 1/(obs_cutoff*12)
+
 
 dtmon_fix       = 60*60*24*30
 
@@ -1519,7 +1534,7 @@ ax2.set_xscale('log')
 ax2.set_xticks(xper_ticks,labels=xper)
 ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
 
-ax.legend(fontsize=fsz_legend,framealpha=0.5,edgecolor='none')
+ax.legend(fontsize=fsz_legend,framealpha=0.5,edgecolor='none',loc='lower left')
 
 for ax in [ax,ax2]:
     ax.tick_params(labelsize=fsz_ticks)

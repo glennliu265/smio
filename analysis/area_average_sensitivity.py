@@ -456,11 +456,8 @@ fsz_legend = 18
 fsz_ticks  = 18
 fsz_axis   = 22
 
-
-
 # Initialize Fig
 fig,ax1           = plt.subplots(1,1,constrained_layout=True,figsize=(14,4.5))
-
 
 # Plot Era
 ax = ax1
@@ -532,10 +529,6 @@ if darkmode:
     
 plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
-
-
-
-
 #%% Compute Metrics for each case
 
 ssts_arr    = [ds.data for ds in ssts_reg]
@@ -543,9 +536,10 @@ lags        = np.arange(61)
 nsmooths    = [250,250,4]
 metrics_out = scm.compute_sm_metrics(ssts_arr,nsmooth=nsmooths,lags=lags)
 
-tsm_m3 = metrics_out
+tsm_m3      = metrics_out
 
 #%% Option to save metrics (works fine)
+
 outname     = "%sMetrics_%s_Method03.npz" % (outpathbb,comparename)
 np.savez(outname,*metrics_out,allow_pickle=True)
 

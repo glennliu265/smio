@@ -53,8 +53,12 @@ acfpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergen
 comparename = "smioOct2025"
 smnc        = acfpath + "SM_SST_ORAS5_avg_GMSST_EOF_usevar_NATL_lag00to40_JFM_ensALL.nc"
 eranc       = acfpath + "ERA5_NAtl_1979to2025_lag00to40_JFM_ensALL.nc"
-
 sm_monnc    = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL_lag00to40_JFM_ensALL.nc"
+
+
+sm_lvl1     = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_lag00to40_JFM_ensALL.nc"
+sm_lvl15    = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar_lag00to40_JFM_ensALL.nc"
+sm_lvl2     = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL_lag00to40_JFM_ensALL.nc"
 
 exppath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL/Metrics/"
 blowupnc    = exppath + "Blowup_Points.nc"
@@ -65,13 +69,18 @@ dssm_mon    = xr.open_dataset(sm_monnc).load()
 dsblowup    = xr.open_dataset(blowupnc).load()
 
 
+dssm_1      = xr.open_dataset(sm_lvl1).load()
+dssm_15     = xr.open_dataset(sm_lvl15).load()
+dssm_2      = xr.open_dataset(sm_lvl2).load()
+
+
 # Also load the monthly version
 
 sm_monthly_nc = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL_lag00to60_ALL_ensALL.nc"
 dsmonthly_nc  = xr.open_dataset(sm_monthly_nc).load()
 
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20251106/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260205/"
 proc.makedir(figpath)
 
 #%% Also Load the MLD
@@ -102,6 +111,11 @@ t2_sm  = proc.calc_T2(dssm.acf.squeeze() * dsmask,axis=-1,verbose=True,ds=True)
 t2_sm_mon =  proc.calc_T2(dssm_mon.acf.squeeze(),axis=-1,verbose=True,ds=True)
 
 t2_monthly = proc.calc_T2(dsmonthly_nc.acf.squeeze(),axis=-1,ds=True)
+
+
+t2_sm1 = proc.calc_T2(dssm_1.acf.squeeze(),axis=-1,verbose=True,ds=True)
+t2_sm15 = proc.calc_T2(dssm_15.acf.squeeze(),axis=-1,verbose=True,ds=True)
+t2_sm2 = proc.calc_T2(dssm_2.acf.squeeze(),axis=-1,verbose=True,ds=True)
 
 
 _,dsmasksm  = proc.resize_ds([dssm.acf,dsmask])
@@ -213,6 +227,8 @@ bb = viz.plot_box(bbox_spgne,ax=ax,color='magenta',linewidth=2.5,proj=proj)
  
 figname = figpath + "Stochastic_Model_AllMonthReg_T2_plotmon%i.png" % plot_mon
 plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
 
 #%% Plot, side by side, the Max Wintertime MLD and the Persistence of ERA5 SST Anomalies
 
@@ -382,13 +398,90 @@ for a,ax in enumerate(axs):
 figname = figpath + "ERAT2_MLD_DraftPlot.png" 
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
+
+#%% Draft 4: Also Include Supp Figure with T2 for other simulations
+
+
+
+
+fsz_axis        = 22
+fsz_tick        = 18
+fsz_title       = 28
+
+
+pmesh           = False
+fsz_axis        = 22
+fsz_tick        = 18
+fig,axs,_       = viz.init_orthomap(1,3,bbsel,figsize=(24,12),centlat=centlat)
+
+smnames = ["Level 1 (SOM)","Level 1.5 (Seasonal MLD)","Level 2 (Entrainment Damping)"]
+
+# Copied from Above
+a         = 1
+lon       = dssm_1.lon
+lat       = dssm_1.lat
+cmap      = cm.devon_r#'cmo.dense'#cm.acton_r
+cints_t2_lab    = np.arange(0,6,1)
+cints_t2        = np.arange(0,4.2,0.2)
+clab      = "Decorrelation Timescale $T_2$ [Years]"
+
+for a,ax in enumerate(axs):
+    
+    if a == 0:
+        plotvar = t2_sm1.mean(0).T # Take Mean Across Run Dimension
+        lon       = dssm_1.lon
+        lat       = dssm_1.lat
+    elif a == 1:
+        plotvar = t2_sm15.mean(0).T # Take Mean Across Run Dimension
+        lon       = dssm_15.lon
+        lat       = dssm_15.lat
+    elif a == 2:
+        plotvar = t2_sm2.mean(0).T # Take Mean Across Run Dimension
+        lon       = dssm_2.lon
+        lat       = dssm_2.lat
+        
+    
+    
+    # Plot Coastline
+    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='dimgray',
+                                        fill_color="lightgray",fontsize=18)
+    
+    # Plot Variable
+    cf      = ax.contourf(lon,lat,plotvar,
+                          levels=cints_t2,
+                          transform=proj,cmap=cmap,zorder=-1,extend='both')
+    
+    cl      = ax.contour(lon,lat,plotvar,
+                          levels=cints_t2_lab,linewidths=.55,colors='w',
+                          transform=proj,zorder=-1)
+    ax.clabel(cl,fontsize=fsz_tick)
+    
+    
+    # Plot the Median Sea Ice Concentration
+    plotvar = dsice
+    icel    = ax.contour(plotvar.longitude,plotvar.latitude,plotvar.siconc_winter_median,levels=[0.15,],
+                      colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
+    
+    
+    bb = viz.plot_box(bbox_spgne,ax=ax,color='magenta',linewidth=2.5,proj=proj)
+    
+    ax.set_title(smnames[a],fontsize=fsz_title)
+    
+t2_cbticks      = np.arange(0,5,1)
+cb = viz.hcbar(cf,ax=axs.flatten(),fontsize=22,pad=0.0001,fraction=0.045)
+cb.set_label(clab,fontsize=fsz_axis) 
+cb.set_ticks(t2_cbticks)
+
+figname = figpath + "Stochastic_Model_T2_AllLevels.png" 
+plt.savefig(figname,dpi=150,bbox_inches='tight') 
+
 #%% Demarcate points blown up
 
 nanids           = dsblowup.min('run').nanid
 blowupmask       = xr.where(nanids > 0,1,0)
 blowupmask_apply = xr.where(nanids > 0,np.nan,1)
 
-#%% Fix this fucking image
+#%% Fix this image
 
 fig,ax,_       = viz.init_orthomap(1,1,bbsel,figsize=(24,12),centlat=centlat,centlon=centlon)
 ax             = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
@@ -405,7 +498,8 @@ pcm         = ax.contourf(lon,lat,plotvar,transform=proj,cmap=cmap)
 
 
 
-#%%
+#%% This is the final version used in Figure 1 of the paper
+
 pmesh           = False
 fsz_axis        = 22
 fsz_tick        = 18
@@ -452,7 +546,7 @@ for a,ax in enumerate(axs):
         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
         cints       = cints_t2 #np.arange(0,5.5,0.5)
         cints_lab   = cints_t2_lab#cints[::2]
-        clab        = "Decorrelation Timescale $T^2$ [Years]"
+        clab        = "Decorrelation Timescale $T_2$ [Years]"
         cbticks     = t2_cbticks
         
     elif a == 0:
@@ -475,7 +569,7 @@ for a,ax in enumerate(axs):
         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
         cints       = cints_t2#np.arange(0,4.2,0.2)#np.arange(0,5.5,0.5)#np.arange(0,36,3)
         cints_lab   = cints_t2_lab #cints[::2]
-        clab        = "Decorrelation Timescale $T^2$ [Years]"
+        clab        = "Decorrelation Timescale $T_2$ [Years]"
         
         cbticks     = t2_cbticks
     

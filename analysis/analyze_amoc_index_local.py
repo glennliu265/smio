@@ -206,7 +206,6 @@ comps = [b'Total', b'Eulerian-Mean Advection',
 icomp = 0
 moca = preprocess_ds(dsmoc.isel(moc_comp=icomp).MOC)
 ssta = preprocess_ds(dsst.TS)
-
 nheata = preprocess_ds(dsnheat.N_HEAT)
 
 # %% Calculate AMOC Index by latitude (max depth)

@@ -194,7 +194,6 @@ plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 #%% Just plot the timeseries to see
 
-
 fig,ax = plt.subplots(layout='constrained',figsize=(10,4.5))
 
 for ii in range(4):
