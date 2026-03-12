@@ -156,6 +156,33 @@ if not np.all(latpom.data == latmask.data):
 #     pcm = axs[cc].pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=0,vmax=1,cmap='cmo.balance')
 #     viz.hcbar(pcm,ax=axs[cc])
 
+
+#%% Select Region and Save Output
+# This is to run in `make_smio_paper_figures.py`
+
+outdir              = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/project_data/timeseries/"
+
+regname             = "SPGNE"
+bbox_spgne          = [-40,-15,52,62]
+locfn,locstring     = proc.make_locstring_bbox(bbox_spgne,lon360=True)
+bbfn                = "%s_%s" % (regname,locfn)
+
+for cc in range(3):
+    dsin    = dscesms[cc]
+    dsreg   = proc.sel_region_xr(dsin,bbox_spgne)
+    aavg    = proc.area_avg_cosweight(dsreg)
+    
+    expname = cesmnames[cc]
+    if expname == "CESM2_POM3":
+        expname = "CESM2_MCOM"
+    
+    ncname  = "%s/Area_Avg_%s_%s.nc" % (outdir,expname,bbfn)
+    edict = proc.make_encoding_dict(aavg)
+    
+    aavg.to_netcdf(ncname,encoding=edict)
+    print(ncname)
+    
+
 # ========================================================
 #%% Load ERA5 and preprocess
 # ========================================================
@@ -204,11 +231,10 @@ dsall       =  dscesms_proc + [sst_era,]
 expnames    =  cesmnames  + ["ERA5",]
 maskall     = [dsmask180_cesm,]*3 + [dsmask_era.mask]
 
-
 dsall_flx   = dscesms_flxs_proc + [flx_era,]
 
 
-expnames_short = ["SOM","PenOM","FCM","ERA5"]
+expnames_short     = ["SOM","PenOM","FCM","ERA5"]
 expnames_short_new = ["SOM","MCOM","FOM","ERA5"]
 expnames_long_old  = ["Slab Ocean Model (60-360)","Multi-Column Ocean Model (100-400)","Full Ocean Model (200-2000)","ERA5 (1979-2024)"]
 
