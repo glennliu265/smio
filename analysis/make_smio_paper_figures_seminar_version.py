@@ -188,13 +188,14 @@ def calc_lag_corr_1d(var1, var2, lags):  # Can make 2d by mirroring calc_lag_cov
 
 #%% Plotting Options/Parameters
 
-darkmode = False
+darkmode = True
 if darkmode:
     dfcol = "w"
     bgcol = np.array([15,15,15])/256
     sp_alpha = 0.05
     transparent = True
     plt.style.use('dark_background')
+    mpl.rcParams['font.family'] = 'Avenir'
     #mpl.rcParams['font.family']     = 'Avenir'
 else:
     dfcol = "k"
@@ -202,10 +203,11 @@ else:
     sp_alpha = 0.75
     transparent = False
     plt.style.use('default')
+    mpl.rcParams['font.family'] = 'Arial'
     
 proj        = ccrs.PlateCarree()
-#mpl.rcParams['font.family'] = 'Avenir'
-mpl.rcParams['font.family'] = 'Arial'
+#
+
 mons3       = proc.get_monstr(nletters=3)
 
 figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260322_IPRC_Seminar/"
