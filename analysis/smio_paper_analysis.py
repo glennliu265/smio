@@ -2,27 +2,36 @@
 # -*- coding: utf-8 -*-
 """
 
-Finalized Script to Generate Figures in the Stochastic Model in Observations (SMIO) Paper
+Script to Perform Analysis and Generate Figures from: Highly persistent subpolar 
+North Atlantic sea surface temperatures are driven by re-emergence and 
+one-dimensional ocean dynamics"
+    Glenn Liu, Young-Oh Kwon, Martha Buckley, Claude Frankingoul, Jongsoo Shin
 
-Based on the following scripts
-Figure 1.A-C : viz_t2_updated_smio.py
-Figure 1.D   : area_average_sensitivity.py
-Figure 2-3   : area_avg_metrics
-Figure 4     : cesm2_hierarchy_v_obs
+Requirements:
+    - functions contained in smio_utils.py
+    - python environment in smio.yml
+    - area-averaged SST from each simulation in smio_data_final/ directory
+    
+    
+Set-up
 
-Created on Tue Mar 10 10:31:33 2026
+(1) Download zip from figshare
+(2) Use conda to install smio.yml environment  (conda env create --file smio.yml)
+(3) Edit absolute paths in `User Edits` Section below to indicate location of directories
+(4) Run Script
 
-@author: gliu
+Created on Fri Apr 10 10:31:33 2026
 
+@author: Glenn Liu
 """
 
 import time
 import numpy as np
-import numpy.ma as ma
+
 import xarray as xr
 import sys
 import tqdm
-import glob 
+
 import scipy as sp
 import cartopy.crs as ccrs
 import cmcrameri.cm as cm
@@ -31,15 +40,19 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-#%% Set Paths
+#%% User Edits: set paths here
 
+# Path to the module script `smio_utils.py`
 smio_utils_path = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/03_Scripts/smio/analysis/"
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260410_Draft06/"
 
-# Path to smio_data_final
+# Path to /smio_data_final/
 dpath           = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/smio_data_final/"
 
-# Load Module with scripts
+# Path for output figures
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260410_Draft06/"
+
+#%% Load Module with scripts
+
 sys.path.append(smio_utils_path)
 import smio_utils as sut
 
@@ -98,20 +111,11 @@ def setup_errorbar(mc_stds,stds,era5_last=False,include_era5=False):
 
 #%% Plotting Options/Parameters
 
-darkmode = False
-if darkmode:
-    dfcol = "w"
-    bgcol = np.array([15,15,15])/256
-    sp_alpha = 0.05
-    transparent = True
-    plt.style.use('dark_background')
-    #mpl.rcParams['font.family']     = 'Avenir'
-else:
-    dfcol = "k"
-    bgcol = "w"
-    sp_alpha = 0.75
-    transparent = False
-    plt.style.use('default')
+dfcol       = "k"
+bgcol       = "w"
+sp_alpha    = 0.75
+transparent = False
+plt.style.use('default')
 
 proj        = ccrs.PlateCarree()
 mpl.rcParams['font.family'] = 'Arial'
@@ -165,11 +169,6 @@ expls           = ['solid',
                    'dashed',
                    'dashed',
                    'dotted']
-
-
-# Region Info
-regname             = "SPGNE"
-bbsel               = [-40,-15,52,62]
 
 # Global Mean Detrending Options
 id_era = expnames.index("SST_ERA5_1979_2024")
@@ -641,10 +640,7 @@ for ii in range(2):
         
         cflag = sut.calc_conflag(plotvar,conf,2,dof_in)
         if ex == id_era:
-            if darkmode:
-                alpha = 0.15
-            else:
-                alpha = 0.05
+            alpha = 0.05
         else:
             alpha = 0.15
         
@@ -739,10 +735,7 @@ blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_l
                                        capsize=5,marker="d",markersize=25,mfc='None',))
 
 # Label Standard Deviations
-if darkmode:
-    upperlbl_col = 'lightgray'
-else:
-    upperlbl_col = 'gray'
+upperlbl_col = 'gray'
 if label_stds:
     ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
     ax.bar_label(blp,fmt="%.02f",c='w',fontsize=fsz_axis,label_type='center')
@@ -1052,10 +1045,7 @@ blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=cesm_errbar_
                                        capsize=5,marker="d",markersize=25,mfc='None',))
 
 # Label Standard Deviations
-if darkmode:
-    upperlbl_col = 'lightgray'
-else:
-    upperlbl_col = 'gray'
+upperlbl_col = 'gray'
 if label_stds:
     ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
     ax.bar_label(blp,fmt="%.02f",c='w',fontsize=fsz_axis,label_type='center')
@@ -1368,10 +1358,7 @@ for mm in range(12):
             dof_in = len(ssts[ex])/12
         cflag = sut.calc_conflag(plotvar,conf,2,dof_in)
         if ex == 2:
-            if darkmode:
-                alpha = 0.15
-            else:
-                alpha = 0.05
+            alpha = 0.05
         else:
             alpha = 0.10
         

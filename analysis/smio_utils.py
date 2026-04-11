@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Functions for analysis for the smio paper
+Functions for "Highly persistent subpolar North Atlantic sea surface 
+temperatures are driven by re-emergence and one-dimensional ocean dynamics"
+    Glenn Liu, Young-Oh Kwon, Martha Buckley, Claude Frankingoul, Jongsoo Shin
 
-
-
-quick_spectrum
-
-Functions Included
+Functions Included in this module
 
 add_coast_grid
 calc_autocorr
@@ -22,7 +20,6 @@ calc_monvar
 calc_pearsonconf
 calc_T2
 compute_sm_metrics
-
 detrend_by_regression
 detrend_dim
 find_nan
@@ -36,11 +33,9 @@ lp_butter
 lon360to180_xr
 lon180to360_xr
 get_monstr
-
 make_2d_ds
 mcsampler
 mcsample_stdev_metrics*
-
 plot_box
 printtime
 quick_spectrum 
@@ -59,35 +54,28 @@ yo_speccl
 
 Created on Fri Apr 10 15:21:12 2026
 
-@author: gliu
+@author: Glenn Liu
+
 """
+
+import time
+import string
 
 import numpy as np
 import xarray as xr
 import calendar as cal
-import numpy.ma as ma
-from scipy import signal,stats
-from scipy import fft
-from scipy.signal import butter, lfilter, freqz, filtfilt, detrend
-import os
-import time
-import scipy
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import scipy as sp
-import pandas as pd
-import datetime
-import tqdm
-import string
-
-import cmocean as cmo
-
-import cartopy.feature as cfeature
 
 from tqdm import tqdm
-from cartopy.util import add_cyclic_point
+
+import scipy as sp
+from scipy import signal,stats,fft
+from scipy.signal import butter, filtfilt
+
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 
+import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
