@@ -206,7 +206,7 @@ else:
     mpl.rcParams['font.family'] = 'Arial'
     
 proj        = ccrs.PlateCarree()
-#
+
 
 mons3       = proc.get_monstr(nletters=3)
 
@@ -264,6 +264,41 @@ expls           = ['solid',
                    'dashed',
                    'dashed',
                    'dotted']
+
+# (13) Seminar Edition (IncreasingComplexity)
+comparename     = "Seminar_IncreasingComplexity"
+expnames        = [
+                    "SST_ERA5_1979_2024",
+                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
+                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
+                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
+
+
+                   ]
+expnames_long   = ["Observations (ERA5)",
+                   "Stochastic Model (slab-like)",
+                   "Stochastic Model (no re-emergence)",
+                   "Stochastic Model (with re-emergence)",
+
+
+                   ]
+expnames_short  = ["Obs.",
+                   "Slab"
+                   "No Re.",
+                   "Re." ]
+expcols         = ["k",
+                   "salmon",
+                   "turquoise",
+                   "gold",
+                   ]
+expls           = ['solid',
+                   'dotted',
+                   'dashed',
+                   'dashed',
+                   ]
+
+
+
 
 # Data Paths and bounding Box
 sm_output_path      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
@@ -383,46 +418,194 @@ else:
 
 proc.printtime(st,"Loaded ACFs and calculated T2")
 
-#%% Visualize 1.A-C
-# This is the final version used in Figure 1 of the paper
+# #%% Visualize 1.A-C
+# # This is the final version used in Figure 1 of the paper
 
-pmesh           = False
-fsz_axis        = 22
-fsz_tick        = 18
-fsz_title       = 28
+# pmesh           = False
+# fsz_axis        = 22
+# fsz_tick        = 18
+# fsz_title       = 28
 
-# 
-id_sm           = 0 # Index of Stochastic Model to plot
-# 0 = With Re-emergence, 1 = No Re-emergence, 2 = Slab-Like for comparename=Draft05_ReverseOrder
+# # 
+# id_sm           = 0 # Index of Stochastic Model to plot
+# # 0 = With Re-emergence, 1 = No Re-emergence, 2 = Slab-Like for comparename=Draft05_ReverseOrder
 
-bbox_spgne      = [-40,-15,52,62]
+# bbox_spgne      = [-40,-15,52,62]
 
-#Contour Settings
-cints_t2_lab    = np.arange(1,6,1)
-cints_t2        = np.arange(1,4.2,0.2)
+# #Contour Settings
+# cints_t2_lab    = np.arange(1,6,1)
+# cints_t2        = np.arange(1,4.2,0.2)
 
-# Bounding Box
+# # Bounding Box
+# bbsel           = [-65, -5, 45, 65] # [-40, -12, 50, 62]
+# centlat         = 55
+# centlon         = -35
+# fix_lon         = np.arange(-60,10,10)
+# fix_lat         = np.arange(45,70,5)
+
+# mld_cbticks     = np.arange(0,600,100)
+# t2_cbticks      = np.arange(1,5,1)
+
+# fig,axs,_       = viz.init_orthomap(1,3,bbsel,figsize=(24,12),centlat=centlat,centlon=centlon)
+
+# for a,ax in enumerate(axs):
+#     ii              = a
+#     ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
+#                                         fill_color="lightgray",fontsize=fsz_tick,
+#                                         fix_lon=fix_lon,fix_lat=fix_lat)
+    
+#     # if a != 2:
+#     #     continue
+#     # Plot the t2
+#     if a == 1:
+#         if use_marthas_t2:
+#             plotvar     = ds2_martha 
+#             lon         = ds2_martha.lon
+#             lat         = ds2_martha.lat
+#             #plotvar     = xr.where(ds2_martha == 1.31955576,1,0)
+            
+#         else:
+#             plotvar     = t2_era5.T
+#             lon         = acfs_era5.lon 
+#             lat         = acfs_era5.lat 
+        
+#         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
+#         cints       = cints_t2 #np.arange(0,5.5,0.5)
+#         cints_lab   = cints_t2_lab#cints[::2]
+#         clab        = "Decorrelation Timescale $T_2$ (Years)"
+#         cbticks     = t2_cbticks
+        
+#     elif a == 0:
+#         plotvar     = dsmld.h.max('mon')# * dsmasksm
+#         lon         = plotvar.lon
+#         lat         = plotvar.lat
+#         cmap        = 'cmo.ice_r'
+#         cints       = np.arange(0,525,25)
+#         cints_lab   = cints[::4]
+#         clab        = "Maximum Climatological Mixed-Layer Depth (meters)"
+        
+#         cbticks     = mld_cbticks
+        
+        
+#     elif a == 2:
+        
+#         plotvar     = t2_sm[id_sm].T #* blowupmask_apply.data #* dsmaskera.data
+#         lon         = acfs_sm[id_sm].lon
+#         lat         = acfs_sm[id_sm].lat
+#         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
+#         cints       = cints_t2#np.arange(0,4.2,0.2)#np.arange(0,5.5,0.5)#np.arange(0,36,3)
+#         cints_lab   = cints_t2_lab #cints[::2]
+#         clab        = "Decorrelation Timescale $T_2$ (Years)"
+        
+#         cbticks     = t2_cbticks
+    
+    
+#     cf      = ax.contourf(lon,lat,plotvar,
+#                           levels=cints,
+#                           transform=proj,cmap=cmap,zorder=-1,extend='both')
+    
+#     cl      = ax.contour(lon,lat,plotvar,
+#                           levels=cints_lab,linewidths=.55,colors='w',
+#                           transform=proj,zorder=-1)
+#     ax.clabel(cl,fontsize=fsz_tick)
+
+    
+#     if a == 0:
+#         cb = viz.hcbar(cf,ax=ax,fontsize=22,pad=0.0001,fraction=0.040)
+#         cb.set_label(clab,fontsize=fsz_axis)
+#         cb.set_ticks(cbticks)
+#     elif a == 2:
+#         cb = viz.hcbar(cf,ax=axs[1:].flatten(),fontsize=22,pad=0.0001,fraction=0.040)
+#         cb.set_label(clab,fontsize=fsz_axis)
+#         cb.set_ticks(cbticks)
+    
+#     # Plot the Median Sea Ice Concentration
+#     plotvar = dsice
+#     icel    = ax.contour(plotvar.longitude,plotvar.latitude,plotvar.siconc_winter_median,levels=[0.15,],
+#                       colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
+    
+    
+#     bb = viz.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
+#     viz.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+
+# figname = figpath + "Figure01_ABC_%s_seminar.png" % comparename 
+# plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
+
+#%% Visualize MLD Separate Panels for the Seminar
+
 bbsel           = [-65, -5, 45, 65] # [-40, -12, 50, 62]
 centlat         = 55
 centlon         = -35
 fix_lon         = np.arange(-60,10,10)
 fix_lat         = np.arange(45,70,5)
 
+fsz_title = 26
+fsz_axis  = 30
+fsz_tick  = 26
+
+
+bbox_spgne      = [-40,-15,52,62]
+
+
+fig,ax,_       = viz.init_orthomap(1,1,bbsel,figsize=(28,10),centlat=centlat,centlon=centlon)
+
 mld_cbticks     = np.arange(0,600,100)
-t2_cbticks      = np.arange(1,5,1)
 
-fig,axs,_       = viz.init_orthomap(1,3,bbsel,figsize=(24,12),centlat=centlat,centlon=centlon)
 
-for a,ax in enumerate(axs):
-    ii              = a
-    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
-                                        fill_color="lightgray",fontsize=fsz_tick,
-                                        fix_lon=fix_lon,fix_lat=fix_lat)
+plotvar         = dsmld.h.max('mon')# * dsmasksm
+lon             = plotvar.lon
+lat             = plotvar.lat
+cmap            = 'cmo.ice_r'
+cints           = np.arange(0,525,25)
+cints_lab       = cints[::4]
+clab            = "Maximum Climatological Mixed-Layer Depth (meters)"
+cbticks         = mld_cbticks
+
+cf      = ax.contourf(lon,lat,plotvar,
+                      levels=cints,
+                      transform=proj,cmap=cmap,zorder=-1,extend='both')
+
+cl      = ax.contour(lon,lat,plotvar,
+                      levels=cints_lab,linewidths=.55,colors=dfcol,
+                      transform=proj,zorder=-1)
+ax.clabel(cl,fontsize=fsz_tick)
+
+
     
-    # if a != 2:
-    #     continue
-    # Plot the t2
-    if a == 1:
+cb = viz.hcbar(cf,ax=ax,fontsize=fsz_axis,pad=0.0001,fraction=0.040)
+cb.set_label(clab,fontsize=fsz_axis)
+cb.set_ticks(cbticks)
+
+# Plot the Median Sea Ice Concentration
+plotvar = dsice
+icel    = ax.contour(plotvar.longitude,plotvar.latitude,plotvar.siconc_winter_median,levels=[0.15,],
+                  colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
+
+ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
+                                    fill_color="lightgray",fontsize=fsz_tick,
+                                    fix_lon=fix_lon,fix_lat=fix_lat)
+
+bb = viz.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj,linestyle='dashed')
+
+figname = figpath + "MLD_Wintertime_SPGNE_seminar.png"
+plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
+
+
+#viz.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+
+#%% Now Visualize T2 Panels
+
+
+
+t2_cbticks      = np.arange(1,5,1)
+cints_t2_lab    = np.arange(1,6,1)
+cints_t2        = np.arange(1,4.2,0.2)
+
+for a in range(4):
+    
+    fig,ax,_        = viz.init_orthomap(1,1,bbsel,figsize=(28,10),centlat=centlat,centlon=centlon)
+    
+    if a == 3:
         if use_marthas_t2:
             plotvar     = ds2_martha 
             lon         = ds2_martha.lon
@@ -439,24 +622,14 @@ for a,ax in enumerate(axs):
         cints_lab   = cints_t2_lab#cints[::2]
         clab        = "Decorrelation Timescale $T_2$ (Years)"
         cbticks     = t2_cbticks
-        
-    elif a == 0:
-        plotvar     = dsmld.h.max('mon')# * dsmasksm
-        lon         = plotvar.lon
-        lat         = plotvar.lat
-        cmap        = 'cmo.ice_r'
-        cints       = np.arange(0,525,25)
-        cints_lab   = cints[::4]
-        clab        = "Maximum Climatological Mixed-Layer Depth (meters)"
-        
-        cbticks     = mld_cbticks
+    
         
         
-    elif a == 2:
+    else:
         
-        plotvar     = t2_sm[id_sm].T #* blowupmask_apply.data #* dsmaskera.data
-        lon         = acfs_sm[id_sm].lon
-        lat         = acfs_sm[id_sm].lat
+        plotvar     = t2_sm[a].T #* blowupmask_apply.data #* dsmaskera.data
+        lon         = acfs_sm[a].lon
+        lat         = acfs_sm[a].lat
         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
         cints       = cints_t2#np.arange(0,4.2,0.2)#np.arange(0,5.5,0.5)#np.arange(0,36,3)
         cints_lab   = cints_t2_lab #cints[::2]
@@ -470,31 +643,37 @@ for a,ax in enumerate(axs):
                           transform=proj,cmap=cmap,zorder=-1,extend='both')
     
     cl      = ax.contour(lon,lat,plotvar,
-                          levels=cints_lab,linewidths=.55,colors='w',
+                          levels=cints_lab,linewidths=1,colors=dfcol,
                           transform=proj,zorder=-1)
     ax.clabel(cl,fontsize=fsz_tick)
-
     
-    if a == 0:
-        cb = viz.hcbar(cf,ax=ax,fontsize=22,pad=0.0001,fraction=0.040)
-        cb.set_label(clab,fontsize=fsz_axis)
-        cb.set_ticks(cbticks)
-    elif a == 2:
-        cb = viz.hcbar(cf,ax=axs[1:].flatten(),fontsize=22,pad=0.0001,fraction=0.040)
-        cb.set_label(clab,fontsize=fsz_axis)
-        cb.set_ticks(cbticks)
+    
+        
+    cb = viz.hcbar(cf,ax=ax,fontsize=fsz_axis,pad=0.0001,fraction=0.040)
+    cb.set_label(clab,fontsize=fsz_axis)
+    cb.set_ticks(cbticks)
     
     # Plot the Median Sea Ice Concentration
     plotvar = dsice
     icel    = ax.contour(plotvar.longitude,plotvar.latitude,plotvar.siconc_winter_median,levels=[0.15,],
                       colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
     
+    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
+                                        fill_color="lightgray",fontsize=fsz_tick,
+                                        fix_lon=fix_lon,fix_lat=fix_lat)
     
-    bb = viz.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
-    viz.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+    bb = viz.plot_box(bbox_spgne,ax=ax,color='forestgreen',linewidth=4.5,proj=proj,linestyle='dashed')
+    
+    figname = figpath + "T2_Wintertime_SPGNE_seminar_Model%i.png" % a
+    plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
 
-figname = figpath + "Figure01_ABC_%s.png" % comparename 
-plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
+
+
+#%%
+
+
+
+
 
 #%% Figure 1 Panel D
 # Set up variables and determine index to plot (based on rmse)
@@ -565,73 +744,89 @@ fsz_axis          = 22
 fsz_title         = 22
 
 # Initialize Fig -------------
-fig,ax1           = plt.subplots(1,1,constrained_layout=True,figsize=(14,4.5))
-
-# Plot ERA5 Timeseries
-ax      = ax1
-l1      = ax.plot(era_sst,label=expnames_long[-1],c=dfcol,lw=ts_lw)
-era_lp  = proc.lp_butter(era_sst,120,6)
-
-# Plot Stochastic Model Timeseries
-ax2 = ax.twiny()
-ax  = ax2
-l2  = ax.plot(sm_sst_sel[imin:imin+ntime_era],label=expnames_long[1],c=expcols[1],lw=ts_lw)
-
-# Set Legend
-ax1.legend([l1[0],l2[0]],
-           ['Observations (ERA5)','Stochastic Model (with Re-emergence)'],
-           loc = 'lower left',
-           fontsize=fsz_legend,ncol=2)
-
-# # Label Axes
-# for ax in axs:
-#     ax.legend(fontsize=fsz_legend)
-#     ax.set_xlim(xlims)
-#     ax.set_ylim(ylims)
-#     ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
-#     ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
+for iiplot in range(2):
+    fig,ax1           = plt.subplots(1,1,constrained_layout=True,figsize=(12,6))
     
-#     if remove_topright:
-#         ax.spines[['right', 'top']].set_visible(False)
+    # Plot ERA5 Timeseries
+    ax      = ax1
+    l1      = ax.plot(era_sst,label=expnames_long[-1],c=dfcol,lw=ts_lw)
+    era_lp  = proc.lp_butter(era_sst,120,6)
+    
+    # # Label Axes
+    # for ax in axs:
+    #     ax.legend(fontsize=fsz_legend)
+    #     ax.set_xlim(xlims)
+    #     ax.set_ylim(ylims)
+    #     ax.set_ylabel("SST Anomaly [$\degree$C]",fontsize=fsz_axis)
+    #     ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
+        
+    if iiplot == 1:
+        
+        # Plot Stochastic Model Timeseries
+        ax2 = ax.twiny()
+        ax  = ax2
+        l2  = ax.plot(sm_sst_sel[imin:imin+ntime_era],label=expnames_long[1],c=expcols[1],lw=ts_lw)
+        
+        # Set Legend
+        ax1.legend([l1[0],l2[0]],
+                   ['Observations (ERA5)','Stochastic Model (with Re-emergence)'],
+                   loc = 'lower left',
+                   fontsize=fsz_legend,ncol=2)
+        
+        # Set xticks for SM
+        ax = ax2
+        ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
+        ax.set_xlim([xplot[0],xplot[-1]])
+        
+        # Adjust Axes 2 color and size for Stochastic Model
+        ax2col = expcols[1]
+        # if ax2col == "gold":
+        #     ax2col = "goldenrod"
+        ax2.tick_params(labelsize=fsz_ticks,colors=ax2col)
+        ax1.spines['top'].set_color(ax2col)
+        ax2.set_xlabel("Stochastic Model Simulation Year",
+                       fontsize=fsz_axis,color=ax2col)
+    
+    else:
+        
+        ax2 = ax.twiny()
+        ax  = ax2
+        ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
+        ax.set_xlim([xplot[0],xplot[-1]])
+        ax2.tick_params(labelsize=fsz_ticks,colors=ax2col)
+        ax2.tick_params(labelsize=fsz_ticks,colors=ax2col)
+        ax2.set_xlabel("Stochastic Model Simulation Year",
+                       fontsize=fsz_axis,color=ax2col)
+        
+        
+    
+    
+    # Axes Formatting -----------
+    # Set xticks for ERA5
+    ax = ax1
+    ax.set_xticks(xplot[::plotint],labels=years[::plotint])
+    ax.set_xlim([xplot[0],xplot[-1]])
+    
 
-# Axes Formatting -----------
-# Set xticks for ERA5
-ax = ax1
-ax.set_xticks(xplot[::plotint],labels=years[::plotint])
-ax.set_xlim([xplot[0],xplot[-1]])
+    
+    # Set Y-axis Limits, add zero line
+    ax1.set_ylim(ylims)
+    ax.axhline([0],ls='dotted',c=dfcol,lw=2)
+    
+    # Set Labels for ERA5
+    ax1.set_ylabel("SPGNE SST Anomaly ($\degree C$)",fontsize=fsz_axis)
+    ax1.tick_params(labelsize=fsz_ticks)
+    #ax1.set_xlabel("Year (Observations)",fontsize=fsz_axis)
+    
+    if remove_topright:
+        ax.spines[['right', 'top']].set_visible(False)
 
-# Set xticks for SM
-ax = ax2
-ax.set_xticks(xplot[::plotint],labels=years_sm[::plotint])
-ax.set_xlim([xplot[0],xplot[-1]])
-
-# Set Y-axis Limits, add zero line
-ax1.set_ylim(ylims)
-ax.axhline([0],ls='dotted',c=dfcol,lw=0.75)
-
-# Set Labels for ERA5
-ax1.set_ylabel("SPGNE SST Anomaly ($\degree C$)",fontsize=fsz_axis)
-ax1.tick_params(labelsize=fsz_ticks)
-ax1.set_xlabel("Year (Observations)",fontsize=fsz_axis)
-
-# Adjust Axes 2 color and size for Stochastic Model
-ax2col = expcols[1]
-if ax2col == "gold":
-    ax2col = "goldenrod"
-ax2.tick_params(labelsize=fsz_ticks,colors=ax2col)
-ax1.spines['top'].set_color(ax2col)
-ax2.set_xlabel("Stochastic Model Simulation Year",
-               fontsize=fsz_axis,color=ax2col)
-if remove_topright:
-    ax.spines[['right', 'top']].set_visible(False)
-
-# Label Subplot
-viz.label_sp(3,case='lower',ax=ax,y=1.2,x=-.1, fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
-
-figname = "%sFigure01D_Timeseries_%s_imin%i_lfp%03i.png" % (figpath,comparename,imin,lpcutoff)
-if darkmode:
-    figname = proc.addstrtoext(figname,"_darkmode")
-plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
+    
+    
+    figname = "%sFigure01D_Timeseries_%s_imin%i_lfp%03i_frame%i.png" % (figpath,comparename,imin,lpcutoff,iiplot)
+    if darkmode:
+        figname = proc.addstrtoext(figname,"_darkmode")
+    plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 # =============================================================================
 #%% Figure 2: Stochastic Model Autocorrelations
@@ -776,7 +971,8 @@ errbar_var_lp = setup_errorbar(mcstds_lp,stds_lp[(id_era+1):],era5_last=False,in
 
 
 fsz_title = 26
-fsz_ticks = 14
+fsz_ticks = 16
+fsz_axis  = 18
 plotkmons = [2,6]
 use_neff  = True
 conf      = 0.95
@@ -785,18 +981,17 @@ alpha     = 0.15 #0.15
 monsfull = proc.get_monstr(nletters=None)
 xtks     = lags[::6]
 
-if nexps == 3:
-    fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(8,6.5))
-else:
-    fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(8,7))
+kmonth   = 2
+expids = np.arange(len(metrics_out['acfs'][kmonth]))
 
-for ii in range(2):
-    ax     = axs[ii]
-    kmonth = plotkmons[ii]
+for frameloop in range(4):
+    
+    
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4.5))
     
     ax,ax2   = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
-    
-    for ex in range(nexps):
+   
+    for ex in expids[:(frameloop+1)]:
         
         if ex == id_era:
             col_in = dfcol
@@ -834,28 +1029,33 @@ for ii in range(2):
         ax.set_xlabel("")
         
     else:
-        ax.set_xlabel("Lag (months)")
-        if nexps == 3:
-            ax.legend(framealpha=0,fontsize=fsz_ticks,ncol=2)
-        else:
-            ax.legend(framealpha=0,fontsize=12,ncol=1)
+        ax.set_xlabel("Lag from %s (months)" % monsfull[kmonth],fontsize=fsz_axis)
+        # if nexps == 3:
+        #     ax.legend(framealpha=1,fontsize=fsz_ticks,ncol=2)
+        # else:
+        #     ax.legend(framealpha=0,fontsize=12,ncol=1)
             
     
-    ax2.tick_params(labelsize=fsz_tick-4)
+    ax2.tick_params(labelsize=fsz_ticks)
     ax.set_ylim([-.25,1])
     
     ax.set_title("")
-    ax.set_ylabel("Correlation with \n %s Anomalies" % (monsfull[kmonth]),fontsize=fsz_tick)
-    
-    viz.label_sp(ii,case='lower',alpha=0.15,ax=ax,y=1.28,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
-                 weight='bold',fontcolor=dfcol)
-    
+    ax.set_ylabel("Correlation with \n %s Anomalies" % (monsfull[kmonth]),fontsize=fsz_axis)
+    ax.tick_params(labelsize=fsz_axis)
     ax.tick_params(labelsize=fsz_ticks)
     
-figname = "%sFigure02_ACF_%s_PaperOutline.png" % (figpath,comparename)
-if darkmode:
-    figname = proc.darkname(figname)
-plt.savefig(figname,dpi=300,transparent=transparent)
+    figname = "%sFigure02_ACF_%s_Seminar_frame%i.png" % (figpath,comparename,frameloop)
+    
+    
+    if darkmode:
+        figname = proc.darkname(figname)
+    plt.savefig(figname,dpi=300,transparent=transparent)
+
+#%%
+
+
+
+
 
 # =============================================================================
 #%% Figure 3: Stochastic Model Hierarchy Variance
@@ -1088,10 +1288,378 @@ viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_t
              weight='bold',fontcolor=dfcol)
 
 # Output Figure
-figname = "%sFigure03_SMHierarchy_Variance_%s.png" % (figpath,comparename)
+figname = "%sFigure03_SMHierarchy_Variance_%s_seminar.png" % (figpath,comparename)
 if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+#%% Plot Overall Standard Deviation (Separate)
+
+fig,ax = plt.subplots(1,1,figsize=(5,5),
+                      constrained_layout=True)
+
+# Panel A Options
+expcols_bar          = np.array(expcols).copy()
+expcols_bar[id_era]  = 'gray' # Set color to gray for ERA5
+label_vratio         = False  # True to Label variance ratios
+label_stds           = True   # True to label stdev on bars
+ytks_var             = np.arange(0.2,1.2,0.2)
+
+# Set Input Data
+instd            = stds
+instd_lp         = stds_lp
+
+# Create Labels
+if label_vratio:
+    xlabs           = ["%s\n%.2f" % (expnames_long[ii],vratio[ii])+"%" for ii in range(len(vratio))]
+else:
+    xlabs  = expnames_short
+
+# Plot Bars
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=errbar_var,
+                         error_kw=dict(ecolor='darkgray',
+                                       barsabove=True,
+                                       capsize=5,marker="o",markersize=25,mfc='None',
+                                       ))
+blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_lp,
+                         error_kw=dict(ecolor=bgcol,
+                                       barsabove=True,
+                                       capsize=5,marker="d",markersize=25,mfc='None',))
+
+
+
+# Label Standard Deviations
+if darkmode:
+    upperlbl_col = 'lightgray'
+else:
+    upperlbl_col = 'gray'
+# if label_stds:
+#     ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
+#     ax.bar_label(blp,fmt="%.02f",c=bgcol,fontsize=fsz_axis,label_type='center')
+
+# Make Fake Legend and place on plot
+colorsf = {'Raw':'gray','10-year low-pass':dfcol,}         
+labels  = list(colorsf.keys())
+handles = [plt.Rectangle((0,0),1,1, color=colorsf[label]) for label in labels]
+ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0,
+          bbox_to_anchor=(0.04, 0.82, 1., .102))
+
+# Set X and Y Labels, Ticks
+ax.set_xticks(np.arange(nexps),labels="",fontsize=fsz_tick,rotation=45)
+#ax.set_ylabel("SST \nStandard Deviation ($\degree$C)",fontsize=fsz_axis)
+ax.set_ylim([0,1.0])
+ax.set_yticks(ytks_var)
+
+ax.tick_params(labelsize=fsz_tick)
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+    
+# Output Figure
+figname = "%sSMHierarchy_Std_%s_seminar.png" % (figpath,comparename)
+if darkmode:
+    figname = proc.darkname(figname)
+plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+#%% Monthly Variance
+
+for iiframe in range(4):
+    fig,ax = plt.subplots(1,1,figsize=(8,4.5),
+                          constrained_layout=True)
+    
+    # Looping by Experiment
+    for ex in range(iiframe+1):
+        
+
+        
+        zorders = [9,9,2,2,]
+        zorder = zorders[ex]
+        
+        # Plot Monthly standard deviation
+        plotvar = monstds[ex]
+        if expnames[ex] == "SST_ERA5_1979_2024":
+            col_in = "w"
+        else:
+            col_in = expcols[ex]
+        ax.plot(mons3,plotvar,label=expnames_long[ex],
+                color=col_in,lw=2.5,ls=expls[ex],marker="o",zorder=zorder)
+        
+        # Plot Confidence Interval (not for ERA5)
+        if ex != id_era:
+            exm1 = ex-1 # Didnt do Monte Carlo for ERA5
+            plotmc = monstds_sample[exm1]
+            bnds   = np.quantile(plotmc,[0.025,0.95],axis=0)
+            
+    
+            
+            ax.fill_between(mons3,bnds[0],bnds[1],color=expcols[ex],alpha=0.15,zorder=1)
+    
+        
+    # Set X and Y Labels, Ticks
+    #ax.set_ylabel("Monthly SST\nStandard Deviation ($\degree$C)",fontsize=fsz_axis)
+    ax.set_xticklabels(mons3,fontsize=fsz_ticks)
+    ax.set_xlim([0,11])
+    ax.set_ylim([0,0.75])
+    ax.set_yticks(np.arange(0.2,1.1,0.2))
+    ax.tick_params(labelsize=22)#fsz_ticks)
+    
+    if remove_topright:
+        ax.spines[['right', 'top']].set_visible(False)
+    
+    
+    # Output Figure
+    figname = "%sSMHierarchy_MonStd_%s_seminar_frame%i.png" % (figpath,comparename,iiframe)
+    if darkmode:
+        figname = proc.darkname(figname)
+    plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+    
+    
+#%% Power Spectra
+
+# Panel C Options
+decadal_focus = True
+obs_cutoff    = 10 # in years
+obs_cutoff    = 1/(obs_cutoff*12)
+dtmon_fix     = 60*60*24*30
+
+fsz_ticks     = 22
+fsz_axis      = 24
+
+# Set Xticks
+if decadal_focus:
+    xper            = np.array([20,10,5,2,1,0.5])
+else:
+    xper            = np.array([40,10,5,1,0.5])
+xper_ticks      = 1 / (xper*12)
+
+for iiframe in range(4):
+    
+    fig,ax = plt.subplots(1,1,figsize=(10,6),
+                          constrained_layout=True)
+    
+    
+    
+    # Loop by experiments
+    for ii in range(iiframe+1):
+        if ii == id_era: # Use Default Color
+            col_in = dfcol
+        else:
+            col_in = expcols[ii]
+
+        
+        # Get Variables
+        plotspec        = metrics_out['specs'][ii] / dtmon_fix
+        plotfreq        = metrics_out['freqs'][ii] * dtmon_fix
+        CCs             = metrics_out['CCs'][ii] / dtmon_fix
+        
+        # Plot Cut Off Section for Obs
+        if ii == id_era:
+            iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
+            ax.loglog(plotfreq,plotspec,label="",c=col_in,ls='dashed',lw=1.5)
+            hiplotfreq     = plotfreq[iplot_hifreq]
+            hiplotspec     = plotspec[iplot_hifreq]
+            ax.loglog(hiplotfreq,hiplotspec,lw=2.5,label=expnames_long[ii],c=col_in,zorder=2)
+            
+        else:
+            zorders = [2,9,3,3,]
+            zorder = zorders[ii]
+            
+            # Plot the other spectra
+            ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long[ii],c=col_in,zorder=zorder)
+            
+        # Plot the 95% Confidence Interval (for stochastic model output)
+        if ii > id_era:
+            
+            iim1 = ii-1 # Since ERA5 was skipped for MonteCarlo Testing
+            
+            plotspec1 = mc_specdicts[iim1]['specs'] / dtmon_fix
+            plotfreq1 = mc_specdicts[iim1]['freqs'][0,:] * dtmon_fix
+            
+            bnds = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
+            
+            ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols[ii],alpha=0.15,zorder=1)
+            #ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
+            #ax.loglog(plotfreq,bnds[1],ls='dotted',color='blue')
+        else:
+            
+            if expnames[ii] == "SST_ERA5_1979_2024":
+                color_in = dfcol# expcols_cesm[ii]
+            else:
+                color_in = expcols_cesm[ii]
+                
+            # Plot Confidence Interval (ERA5)
+            alpha           = 0.15
+            cloc_era        = [2e-2,6]
+            dof_era         = metrics_out['dofs'][id_era]
+            cbnds_era       = proc.calc_confspec(alpha,dof_era)
+            ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=color_in,alpha=0.15,zorder=1)
+    
+    
+    
+    # Set Vertical Lines, Axes Labels
+    ax.set_xlim([xper_ticks[0],0.5])
+    ax.axvline([1/(6)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(5*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(2*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(10*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(20*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(40*12)],label="",ls='dotted',c='lightgray')
+    
+    ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
+    ax.set_ylabel("Power ($\degree C ^2 / cycle \, per \, mon$)",fontsize=fsz_axis)
+    
+    
+    # # Add Legend
+    # ax.legend(fontsize=fsz_legend_spectra,framealpha=0.5,edgecolor='none')
+    
+    # Twin X-Axis for Period Labels
+    ax2 = ax.twiny()
+    ax2.set_xlim([xper_ticks[0],0.5])
+    ax2.set_xscale('log')
+    ax2.set_xticks(xper_ticks,labels=xper)
+    ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
+    for ax in [ax,ax2]:
+        ax.tick_params(labelsize=fsz_ticks)
+        
+    ax.set_ylim([5e-3,1e2])
+    
+    # # Label Subplot
+    # viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
+    #              weight='bold',fontcolor=dfcol)
+    
+    # Output Figure
+    figname = "%sSMHierarchy_Spectra_%s_seminar_frame%i.png" % (figpath,comparename,iiframe)
+    if darkmode:
+        figname = proc.darkname(figname)
+    plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+
+
+#%% Separate Plots for variance and monthly variance
+
+# Just DO the Monthly Variance and Bar Plots
+
+fsz_tick = 24
+fsz_legend = 22
+# Initialize Figure using Gridspec
+fig             = plt.figure(figsize=(14,4.5))
+gs              = gridspec.GridSpec(4,14)
+
+ax11            = fig.add_subplot(gs[:,:5],) # Barplot
+ax22            = fig.add_subplot(gs[:,6:])  # Month Std
+
+# --------------------------------- # Barplot
+ax                   = ax11
+
+
+# Panel A Options
+expcols_bar          = np.array(expcols).copy()
+expcols_bar[id_era]  = 'gray' # Set color to gray for ERA5
+label_vratio         = False  # True to Label variance ratios
+label_stds           = True   # True to label stdev on bars
+ytks_var             = np.arange(0.2,1.2,0.2)
+
+# Set Input Data
+instd            = stds
+instd_lp         = stds_lp
+
+# Create Labels
+if label_vratio:
+    xlabs           = ["%s\n%.2f" % (expnames_long[ii],vratio[ii])+"%" for ii in range(len(vratio))]
+else:
+    xlabs  = expnames_short
+
+# Plot Bars
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=errbar_var,
+                         error_kw=dict(ecolor='darkgray',
+                                       barsabove=True,
+                                       capsize=5,marker="o",markersize=25,mfc='None',
+                                       ))
+blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=errbar_var_lp,
+                         error_kw=dict(ecolor=bgcol,
+                                       barsabove=True,
+                                       capsize=5,marker="d",markersize=25,mfc='None',))
+
+
+
+# Label Standard Deviations
+if darkmode:
+    upperlbl_col = 'lightgray'
+else:
+    upperlbl_col = 'gray'
+# if label_stds:
+#     ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
+#     ax.bar_label(blp,fmt="%.02f",c=bgcol,fontsize=fsz_axis,label_type='center')
+
+# Make Fake Legend and place on plot
+colorsf = {'Raw':'gray','10-year low-pass':dfcol,}         
+labels  = list(colorsf.keys())
+handles = [plt.Rectangle((0,0),1,1, color=colorsf[label]) for label in labels]
+ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0,
+          bbox_to_anchor=(0.04, 0.82, 1., .102))
+
+# Set X and Y Labels, Ticks
+ax.set_xticks(np.arange(nexps),labels="",fontsize=fsz_tick,rotation=45)
+#ax.set_ylabel("SST \nStandard Deviation ($\degree$C)",fontsize=fsz_axis)
+ax.set_ylim([0,1.0])
+ax.set_yticks(ytks_var)
+
+ax.tick_params(labelsize=fsz_tick)
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+
+# # Label Subplot
+# viz.label_sp(0,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.45,fig=fig,fontsize=fsz_title,labelstyle="%s",
+#              weight='bold',fontcolor=dfcol)
+
+# --------------------------------- # Monthly Variance
+ax              = ax22
+
+# Looping by Experiment
+for ex in range(nexps):
+    zorders = [9,9,2,2,]
+    zorder = zorders[ex]
+        
+    # Plot Monthly standard deviation
+    plotvar = monstds[ex]
+    if expnames[ex] == "SST_ERA5_1979_2024":
+        col_in = "w"
+    else:
+        col_in = expcols[ex]
+    ax.plot(mons3,plotvar,label=expnames_long[ex],
+            color=col_in,lw=2.5,ls=expls[ex],marker="o",zorder=zorder)
+    
+    # Plot Confidence Interval (not for ERA5)
+    if ex != id_era:
+        exm1 = ex-1 # Didnt do Monte Carlo for ERA5
+        plotmc = monstds_sample[exm1]
+        bnds   = np.quantile(plotmc,[0.025,0.95],axis=0)
+        
+
+        
+        ax.fill_between(mons3,bnds[0],bnds[1],color=expcols[ex],alpha=0.10,zorder=1)
+
+
+# Set X and Y Labels, Ticks
+#ax.set_ylabel("Monthly SST\nStandard Deviation ($\degree$C)",fontsize=fsz_axis)
+ax.set_xticklabels(mons3,fontsize=fsz_ticks)
+ax.set_xlim([0,11])
+ax.set_ylim([0,0.75])
+ax.set_yticks(np.arange(0.2,1.1,0.2))
+ax.tick_params(labelsize=22)#fsz_ticks)
+
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+
+# # Label Subplot d
+# viz.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
+#              weight='bold',fontcolor=dfcol)
+
+
+
+
 
 # =============================================================================
 #%% Figure 4: CESM Hierarchy Variance
@@ -1141,7 +1709,7 @@ cmetrics  = scm.compute_sm_metrics(cssts,nsmooth=nsmooths,lags=lags,detrend_acf=
 cstd_metrics      = calc_stds_sample(cssts)
 cvratio           = cstd_metrics[-1]
 
-#%% Compute Singificance of Spectra
+#%% Compute Significance of Spectra
 
 nsmooth = 4
 mciter  = 10000
@@ -1410,10 +1978,274 @@ viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_t
              weight='bold',fontcolor=dfcol)
 
 # Output Figure
-figname = "%sFigure04_CESMHierarchy_Variance_%s.png" % (figpath,comparename)
+figname = "%sFigure04_CESMHierarchy_Variance_%s_seminar.png" % (figpath,comparename)
 if darkmode:
     figname = proc.darkname(figname)
 plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+
+# Now Do the Plots Separately
+#%% Standard Deviation
+fig,ax = plt.subplots(1,1,figsize=(5,5),
+                      constrained_layout=True)
+
+label_vratio         = False  # True to Label variance ratios
+label_stds           = False   # True to label stdev on bars
+ytks_var             = np.arange(0.2,1.3,0.2)
+
+# Set Input Data
+instd                = np.hstack([stds[0],cstds])
+instd_lp             = np.hstack([stds_lp[0],cstds_lp])
+
+
+# Create Labels
+if label_vratio:
+    xlabs           = ["%s\n%.2f" % (expnames_long_cesm[ii],vratio_cesm[ii])+"%" for ii in range(nexps)]
+else:
+    xlabs            = expnames_short_cesm
+
+# Plot Bars
+braw            = ax.bar(np.arange(nexps),instd,color=expcols_bar,yerr=cesm_errbar_var,
+                         error_kw=dict(ecolor='darkgray',
+                                       barsabove=True,
+                                       capsize=5,marker="o",markersize=25,mfc='None',
+                                       ))
+blp             = ax.bar(np.arange(nexps),instd_lp,color=dfcol,yerr=cesm_errbar_var_lp,
+                         error_kw=dict(ecolor='slateblue',
+                                       barsabove=True,
+                                       capsize=5,marker="d",markersize=25,mfc='None',))
+
+# Label Standard Deviations
+if darkmode:
+    upperlbl_col = 'lightgray'
+else:
+    upperlbl_col = 'gray'
+if label_stds:
+    ax.bar_label(braw,fmt="%.02f",c=upperlbl_col,fontsize=fsz_axis)
+    ax.bar_label(blp,fmt="%.02f",c='w',fontsize=fsz_axis,label_type='center')
+
+# Make Fake Legend and place on plot
+colorsf = {'Raw':'gray','10-year low-pass':dfcol,}         
+labels  = list(colorsf.keys())
+handles = [plt.Rectangle((0,0),1,1, color=colorsf[label]) for label in labels]
+ax.legend(handles, labels,fontsize=fsz_legend,framealpha=0,
+          bbox_to_anchor=(0.04, 0.82, 1., .102))
+
+# Set X and Y Labels, Ticks
+ax.set_xticks(np.arange(nexps),labels=["",]*4,fontsize=fsz_tick,rotation=45)
+
+ax.set_ylim([0,1.2])
+ax.set_yticks(ytks_var)
+ax.tick_params(labelsize=fsz_tick)
+if remove_topright:
+    ax.spines[['right', 'top']].set_visible(False)
+
+# Output Figure
+figname = "%sCESMHierarchy_Std_%s_seminar.png" % (figpath,comparename)
+if darkmode:
+    figname = proc.darkname(figname)
+plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+
+#%% Plot Overall Standard Deviation (Separate)
+
+
+
+    
+
+
+#%% Monthly Variance
+
+
+for iiframe in range(4):
+    
+    fig,ax = plt.subplots(1,1,figsize=(8,4.5),
+                          constrained_layout=True)
+    
+    # Looping by Experiment
+    for ex in range(iiframe+1):
+        
+        # Plot Monthly standard deviation
+        plotvar = monstds_cesm[ex]
+        
+        
+        if expnames[ex] == "SST_ERA5_1979_2024":
+            color_in = dfcol
+        else:
+            color_in = expcols_cesm[ex]
+        ax.plot(mons3,plotvar,label=expnames_long_cesm[ex],
+                color=color_in ,lw=2.5,ls=expls[ex],marker="o",zorder=1)
+        
+        # Plot Confidence Interval (not for ERA5)
+        if ex != id_era:
+            exm1   = ex -1
+            plotmc = cesm_mc_monstds[exm1] 
+            bnds   = np.quantile(plotmc,[0.025,0.95],axis=0)
+            ax.fill_between(mons3,bnds[0],bnds[1],color=expcols_cesm[ex],alpha=0.10,zorder=1)
+            
+            
+    
+    # Set X and Y Labels, Ticks
+    #ax.set_ylabel("Monthly $\sigma(SST)$ [$\degree$C]",fontsize=fsz_axis)
+    #ax.set_ylabel("Monthly SST\nStandard Deviation ($\degree$C)",fontsize=fsz_axis)
+    ax.set_xticklabels(mons3)
+    ax.set_xlim([0,11])
+    ax.set_ylim([0,1.2])
+    ax.set_yticks(np.arange(0.2,1.3,0.2))
+    ax.tick_params(labelsize=fsz_ticks)
+    if remove_topright:
+        ax.spines[['right', 'top']].set_visible(False)
+
+    # # Label Subplot
+    # viz.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
+    #              weight='bold',fontcolor=dfcol)
+        
+
+    # Output Figure
+    figname = "%sCESMHierarchy_MonStd_%s_seminar_frame%i.png" % (figpath,comparename,iiframe)
+    if darkmode:
+        figname = proc.darkname(figname)
+    plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+    
+    
+    
+#%% Power Spectra
+
+# Panel C Options
+decadal_focus = True
+obs_cutoff    = 10 # in years
+obs_cutoff    = 1/(obs_cutoff*12)
+dtmon_fix     = 60*60*24*30
+
+fsz_ticks     = 22
+fsz_axis      = 24
+
+# Set Xticks
+if decadal_focus:
+    xper            = np.array([20,10,5,2,1,0.5])
+else:
+    xper            = np.array([40,10,5,1,0.5])
+xper_ticks      = 1 / (xper*12)
+
+for iiframe in range(4):
+    
+    fig,ax = plt.subplots(1,1,figsize=(10,6),
+                          constrained_layout=True)
+    
+    
+    
+    # Loop by experiments
+    for ii in range(iiframe+1):
+        if ii == id_era: # Use Default Color
+            col_in = dfcol
+            
+            # Get Variables
+            plotspec        = metrics_out['specs'][id_era] / dtmon_fix
+            plotfreq        = metrics_out['freqs'][id_era] * dtmon_fix
+            CCs             = metrics_out['CCs'][id_era] / dtmon_fix
+            
+        else:
+            
+            iim1            = ii - 1 # Since ERA5 was skipped in CESM spectra calculations
+            col_in          = expcols_cesm[ii]
+        
+            # Get Variables
+            plotspec        = cmetrics['specs'][iim1] / dtmon_fix
+            plotfreq        = cmetrics['freqs'][iim1] * dtmon_fix
+            CCs             = cmetrics['CCs'][iim1] / dtmon_fix
+            
+        # Plot Cut Off Section for Obs
+        if ii == id_era:
+            iplot_hifreq = np.where(plotfreq > obs_cutoff)[0]
+            ax.loglog(plotfreq,plotspec,label="",c=col_in,ls='dashed',lw=1.5)
+            hiplotfreq     = plotfreq[iplot_hifreq]
+            hiplotspec     = plotspec[iplot_hifreq]
+            ax.loglog(hiplotfreq,hiplotspec,lw=2.5,label=expnames_long_cesm[ii],c=col_in,zorder=2)
+            
+        else:
+            zorders = [9,9,2,2,]
+            zorder = zorders[ii]
+            # Plot the other spectra
+            ax.loglog(plotfreq,plotspec,lw=2.5,label=expnames_long_cesm[ii],c=col_in,zorder=zorder)
+            
+        # Plot the 95% Confidence Interval (for stochastic model output)
+        if ii > id_era:
+            
+            iim1 = ii-1 # Since ERA5 was skipped for MonteCarlo Testing
+            
+            plotspec1 = cesm_specdicts[iim1]['specs'] / dtmon_fix
+            plotfreq1 = cesm_specdicts[iim1]['freqs'][0,:] * dtmon_fix
+            
+            bnds       = np.quantile( plotspec1 ,[0.025,0.975],axis=0)
+            
+            ax.fill_between(plotfreq1,bnds[0],bnds[1],color=expcols_cesm[ii],alpha=0.15,zorder=1)
+            #ax.loglog(plotfreq,bnds[0],ls='dotted',color='blue',label="95% Conf.")
+            #ax.loglog(plotfreq,bnds[1],ls='dotted',color='blue')
+        else:
+            
+            if expnames[ii] == "SST_ERA5_1979_2024":
+                color_in = dfcol# expcols_cesm[ii]
+            else:
+                color_in = expcols_cesm[ii]
+            
+            # Plot Confidence Interval (ERA5)
+            alpha           = 0.05
+            cloc_era        = [2e-2,6]
+            dof_era         = metrics_out['dofs'][id_era]
+            cbnds_era       = proc.calc_confspec(alpha,dof_era)
+            ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=color_in,alpha=0.15,zorder=1)
+    
+    
+    
+    # Set Vertical Lines, Axes Labels
+    ax.set_xlim([xper_ticks[0],0.5])
+    ax.axvline([1/(6)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(5*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(2*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(10*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(20*12)],label="",ls='dotted',c='lightgray')
+    ax.axvline([1/(40*12)],label="",ls='dotted',c='lightgray')
+    
+    ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
+    ax.set_ylabel("Power ($\degree C ^2 / cycle \, per \, mon$)",fontsize=fsz_axis)
+    
+    
+    # # Add Legend
+    # ax.legend(fontsize=fsz_legend_spectra,framealpha=0.5,edgecolor='none')
+    
+    # Twin X-Axis for Period Labels
+    ax2 = ax.twiny()
+    ax2.set_xlim([xper_ticks[0],0.5])
+    ax2.set_xscale('log')
+    ax2.set_xticks(xper_ticks,labels=xper)
+    ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
+    for ax in [ax,ax2]:
+        ax.tick_params(labelsize=fsz_ticks)
+        
+    ax.set_ylim([1e-3,1e2])
+    
+    # # Label Subplot
+    # viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
+    #              weight='bold',fontcolor=dfcol)
+    
+    # Output Figure
+    figname = "%sCESMHierarchy_Spectra_%s_seminar_frame%i.png" % (figpath,comparename,iiframe)
+    if darkmode:
+        figname = proc.darkname(figname)
+    plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
+
+
+#%%
+
+
+
+#%%
+
+
+#%%
+
+
 
 
 

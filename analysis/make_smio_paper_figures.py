@@ -208,7 +208,7 @@ proj        = ccrs.PlateCarree()
 mpl.rcParams['font.family'] = 'Arial'
 mons3       = proc.get_monstr(nletters=3)
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260322_IPRC_Seminar/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260410_Draft06/"
 proc.makedir(figpath)
 
 
@@ -1065,8 +1065,8 @@ ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
 
-ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
-ax.set_ylabel("Power ($\degree C ^2 / cycle \, per \, mon$)",fontsize=fsz_axis)
+ax.set_xlabel("Frequency ($month^{-1}$)",fontsize=fsz_axis)
+ax.set_ylabel("Power ($\degree C ^2 cycle \, per \, mon^{-1}$)",fontsize=fsz_axis)
 
 
 # Add Legend
@@ -1386,13 +1386,13 @@ ax.axvline([1/(10*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(20*12)],label="",ls='dotted',c='gray')
 ax.axvline([1/(40*12)],label="",ls='dotted',c='gray')
 
-ax.set_xlabel("Frequency (1/month)",fontsize=fsz_axis)
-ax.set_ylabel("Power ($\degree C ^2 / cycle \, per \, mon$)",fontsize=fsz_axis)
+ax.set_xlabel("Frequency ($month^{-1}$)",fontsize=fsz_axis)
+ax.set_ylabel("Power ($\degree C ^2 cycle \, per \, mon^{-1}$)",fontsize=fsz_axis)
 
-# Add Legend
+# Add Legend 
 ax.legend(fontsize=fsz_legend_spectra,framealpha=0.5,edgecolor='none',loc='lower left')
 
-# Twin X-Axis for Period Labels
+# Twin X-Axis for Period Labels 
 ax2 = ax.twiny()
 ax2.set_xlim([xper_ticks[0],0.5])
 ax2.set_xscale('log')
@@ -1400,8 +1400,6 @@ ax2.set_xticks(xper_ticks,labels=xper)
 ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
 for ax in [ax,ax2]:
     ax.tick_params(labelsize=fsz_ticks)
-
-
 
 # Label Subplot
 viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
@@ -1658,7 +1656,6 @@ plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
 # =======================
 # %% Load data
 # =======================
-
 
 # Load the netCDF
 amocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/proc/"
