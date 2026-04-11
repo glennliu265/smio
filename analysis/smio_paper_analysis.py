@@ -7,13 +7,8 @@ Finalized Script to Generate Figures in the Stochastic Model in Observations (SM
 Based on the following scripts
 Figure 1.A-C : viz_t2_updated_smio.py
 Figure 1.D   : area_average_sensitivity.py
-
 Figure 2-3   : area_avg_metrics
-
 Figure 4     : cesm2_hierarchy_v_obs
-
-
-
 
 Created on Tue Mar 10 10:31:33 2026
 
@@ -22,10 +17,8 @@ Created on Tue Mar 10 10:31:33 2026
 """
 
 import time
-
 import numpy as np
 import numpy.ma as ma
-
 import xarray as xr
 import sys
 import tqdm
@@ -38,68 +31,19 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-#%% Import Modules
+#%% Set Paths
 
-# local device (currently set to run on Astraeus, customize later)
-amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
+smio_utils_path = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/03_Scripts/smio/analysis/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260410_Draft06/"
 
-sys.path.append(amvpath)
-sys.path.append(scmpath)
+# Path to smio_data_final
+dpath           = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/smio_data_final/"
 
-from amv import proc,viz
-import scm
-import amv.loaders as dl
-import cvd_utils as cvd
+# Load Module with scripts
+sys.path.append(smio_utils_path)
+import smio_utils as sut
 
 #%% Additional Functions
-
-def calc_stds_sample(aavgs):
-    # Apply 10-year LP Filter to List of Timeseries and compute the st. dev.
-    aavgs_lp = [proc.lp_butter(aavg,120,6) for aavg in aavgs] # Calculate Low Pass Filter
-    stds     = np.array([np.nanstd(ss) for ss in aavgs])      # Compute Standard Deviation
-    stds_lp  = np.array([np.nanstd(ss) for ss in aavgs_lp])   # Compute LP-Filtered Standard Deviation
-    vratio   = stds_lp/stds * 100 # Compute Ratio of Stdev.
-    return aavgs_lp,stds,stds_lp,vratio
-
-def mcsample_stdev_metrics(target_timeseries,sample_length,mciter):
-    # Given a list of target timeseries
-    # Sample [mciter] random samples of length [sample_length]
-    # and compute the standard deviation (std), low-pass std, and monthly std 
-    """
-    Output
-        1) mc_stds     : LIST [ex][mciter]     standard deviations for all samples
-        2) mc_stds_lp  : LIST [ex][mciter]     standard deviations for 10-year low-passed samples
-        3) mc_stds_mon : LIST [ex][mciter][12] monthly standard deviations for all samples
-    
-    """
-    
-    nexp = len(target_timeseries)
-    
-    mc_stds         = []
-    mc_stds_lp      = []
-    mc_stds_mon     = []
-    
-    for ex in tqdm.tqdm(range(nexp)):
-        
-        # Take Samples and compute low-pass filter
-        timeseries_in   = target_timeseries[ex]
-        mcdict          = proc.mcsampler(timeseries_in,sample_length,mciter)
-        samples         = [mcdict['samples'][ii,:] for ii in range(mciter)]
-        samples_lp      = [proc.lp_butter(ts,120,6) for ts in samples]
-        
-        # Compute Monthly Stdev
-        monstds_mc      = mcdict['samples'].reshape(mciter,int(sample_length/12),12).std(1)
-        mc_stds_mon.append(monstds_mc)
-        
-        # Compute Standard Deviation
-        mc_stds.append( np.nanstd(np.array(samples),1) )
-        
-        # Compute Low-pass Standard Deviation
-        mc_stds_lp.append( np.nanstd(np.array(samples_lp),1) )
-    
-    return mc_stds,mc_stds_lp,mc_stds_mon
-
 
 def setup_errorbar(mc_stds,stds,era5_last=False,include_era5=False):
     
@@ -151,40 +95,6 @@ def setup_errorbar(mc_stds,stds,era5_last=False,include_era5=False):
         errbar_var[0,:] = np.hstack([[None,],lowervar])
         errbar_var[1,:] = np.hstack([[None,],uppervar])
     return errbar_var
-    
-    
-def calc_lag_corr_1d(var1, var2, lags):  # Can make 2d by mirroring calc_lag_covar_annn
-    # Calculate the regression where
-    # (+) lags indicate var1 lags  var2 (var 2 leads)
-    # (-) lags indicate var1 leads var2 (var 1 leads)
-
-    ntime = len(var1)
-    betalag = []
-    poslags = lags[lags >= 0]
-    for l, lag in enumerate(poslags):
-        varlag = var1[lag:]
-        varbase = var2[:(ntime-lag)]
-
-        # Calculate correlation
-        # np.polyfit(varbase,varlag,1)[0]
-        beta = sp.stats.linregress(varbase, varlag)[2]
-        betalag.append(beta.item())
-
-    neglags = lags[lags < 0]
-    # Sort from least to greatest #.sort
-    neglags_sort = np.sort(np.abs(neglags))
-    betalead = []
-
-    for l, lag in enumerate(neglags_sort):
-        varlag = var2[lag:]  # Now Varlag is the base...
-        varbase = var1[:(ntime-lag)]
-        # Calculate correlation
-        # beta = np.polyfit(varlag,varbase,1)[0]
-        beta = sp.stats.linregress(varlag, varbase)[2]
-        betalead.append(beta.item())
-
-    # Append Together
-    return np.concatenate([np.flip(np.array(betalead)), np.array(betalag)])
 
 #%% Plotting Options/Parameters
 
@@ -202,29 +112,23 @@ else:
     sp_alpha = 0.75
     transparent = False
     plt.style.use('default')
-    
+
 proj        = ccrs.PlateCarree()
-#mpl.rcParams['font.family'] = 'Avenir'
 mpl.rcParams['font.family'] = 'Arial'
-mons3       = proc.get_monstr(nletters=3)
-
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260410_Draft06/"
-proc.makedir(figpath)
-
+mons3       = sut.get_monstr(nletters=3)
 
 #%% Load Sea Ice Concentration File (Median 15%)
 
-dpath   = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
 ncice   = "%sERA5_IceMask_Global_1979_2024_Median15.nc" % (dpath)
 dsice   = xr.open_dataset(ncice)
 
 dsmask  = dsice.median_mask_15pct
 dsmask  = dsmask.rename({'latitude':'lat','longitude':'lon'})
-dsmask  = proc.lon360to180_xr(dsmask)
+dsmask  = sut.lon360to180_xr(dsmask)
 
 #%% Also Load the MLD, regridded to ERA5 resolution using bilinear interp
 
-ncmld   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/MIMOC_regridERA5_h_pilot.nc"
+ncmld   = "%sMIMOC_regridERA5_h_pilot.nc" % (dpath)
 dsmld   = xr.open_dataset(ncmld).load()
 
 # =============================================================================
@@ -237,13 +141,12 @@ For calculating results for Figures 2,3
 """
 
 #% Standardized Names and Colors
-# (13) Draft 5 Edition (Reversing Order)
-comparename     = "Draft05_ReverseOrder"
+comparename     = "Draft06"
 expnames        = [
                     "SST_ERA5_1979_2024",
-                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
-                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
-                    "SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
+                    "Stochastic_Model_withReemergence",
+                    "Stochastic_Model_NoReemergence",
+                    "Stochastic_Model_Slablike",
                    ]
 expnames_long   = ["Observations (ERA5)",
                    "Stochastic Model (with re-emergence)",
@@ -263,18 +166,14 @@ expls           = ['solid',
                    'dashed',
                    'dotted']
 
-# Data Paths and bounding Box
-sm_output_path      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
+
 # Region Info
 regname             = "SPGNE"
 bbsel               = [-40,-15,52,62]
-locfn,locstring     = proc.make_locstring_bbox(bbsel,lon360=True)
-bbfn                = "%s_%s" % (regname,locfn)
 
 # Global Mean Detrending Options
 id_era = expnames.index("SST_ERA5_1979_2024")
 detrend_obs_regression = True # Set to True to detrend obs using monthly regression to global mean
-dpath_gmsst            = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
 nc_gmsst               = "ERA5_GMSST_1979_2024.nc"
 
 #% Load output area-averaged over the northeastern subpolar gyre (SPGNE)
@@ -282,16 +181,15 @@ nexps = len(expnames)
 dsall = []
 for ex in tqdm.tqdm(range(nexps)):
     expname = expnames[ex]
-    ncname  = "%s%s/Metrics/Area_Avg_%s.nc" % (sm_output_path,expname,bbfn)
+    ncname  = "%s%s_SST_SPGNE_Average.nc" % (dpath,expname)
     
     ds      = xr.open_dataset(ncname).load()
     dsall.append(ds)
-    
-    
+
 #% Preprocessing (Deseason Only)
-dsa      = [proc.xrdeseason(ds) for ds in dsall]
+dsa      = [sut.xrdeseason(ds) for ds in dsall]
 ssts     = [sp.signal.detrend(ds.SST.data) for ds in dsa] # Detrend for Stochastic Model
-ssts_ds  = [proc.xrdetrend(ds.SST) for ds in dsa] # Detrend for Stochastic Model
+ssts_ds  = [sut.xrdetrend(ds.SST) for ds in dsa] # Detrend for Stochastic Model
 
 #% Detrend ERA5 using Global Mean Regression Approach
 if (detrend_obs_regression):
@@ -299,19 +197,15 @@ if (detrend_obs_regression):
     sst_era = dsa[id_era].SST # Take undetrended ERA5 SST
     sst_era = sst_era.expand_dims(dim=dict(lon=1,lat=1))
     
-    # Add dummy lat lon
-    #sst_era['lon'] = 1
-    #sst_era['lat'] = 1
-    
     # Load GMSST
-    ds_gmsst     = xr.open_dataset(dpath_gmsst + nc_gmsst).GMSST_MaxIce.load()
-    dsdtera5     = proc.detrend_by_regression(sst_era,ds_gmsst,regress_monthly=True)
+    ds_gmsst     = xr.open_dataset(dpath + nc_gmsst).GMSST_MaxIce.load()
+    dsdtera5     = sut.detrend_by_regression(sst_era,ds_gmsst,regress_monthly=True)
     
     sst_era_dt = dsdtera5.SST.squeeze()
     
     ssts_ds[id_era] = sst_era_dt
     ssts[id_era]    = sst_era_dt.data
-    #print("\nSkipping ERA5, loading separately")
+
 
 # =============================================================================
 #%% Figure 1 T2 and Timeseries...
@@ -328,58 +222,39 @@ Panels A-C
 #% Load Necessary Data (autocorrelations) and compute T2
 
 # Additional Options and Toggles
-use_marthas_t2 = True # Set to True to use Marthas T2
-
-st = time.time()
+st             = time.time()
 
 # Input Information
-acfpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-sm_lvl3     = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL_lag00to40_JFM_ensALL.nc"
-sm_lvl2     = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL_lag00to40_JFM_ensALL.nc"
-sm_lvl15    = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar_lag00to40_JFM_ensALL.nc"
-sm_lvl1     = acfpath + "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_lag00to40_JFM_ensALL.nc"
-
-if comparename == "Draft05_ReverseOrder":
-    ncs_sm   = [sm_lvl3,sm_lvl2,sm_lvl1]
-else:
-    print("(!) Warning! Need to set up [acfs_sm] and [acfs_name] for %s" % comparename)
+sm_lvl3     = dpath   + "Stochastic_Model_withReemergence_ACF_JFM.nc"
+sm_lvl2     = dpath   + "Stochastic_Model_NoReemergence_ACF_JFM.nc"
+sm_lvl1     = dpath   + "Stochastic_Model_Slablike_ACF_JFM.nc"
+ncs_sm      = [sm_lvl3,sm_lvl2,sm_lvl1]
 
 # Load NetCDFs for Stochastic Model Hierarchy
 acfs_sm = [xr.open_dataset(nc).load() for nc in ncs_sm]
 
 # For SM, integrate whole ACF due to long integration time
-t2_sm   = [proc.calc_T2(ds.acf.squeeze(),axis=-1,verbose=True,ds=True) for ds in acfs_sm]
+t2_sm   = [sut.calc_T2(ds.acf.squeeze(),axis=-1,verbose=True,ds=True) for ds in acfs_sm]
 t2_sm   = [t2.mean(0) for t2 in t2_sm] # Take Mean across 10 stochastic model simulations
 
 # Load Observational T2
-if use_marthas_t2:
-    print("Loading T2 Computed by Martha using AR-Fitting")
-    fpath           = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-    fn              = "T2_SSTwint_regOutGM_arYW_AICr_remPolyOrder0_1950-2024.nc"
-    ds2             = xr.open_dataset(fpath+fn).load()
-    
-    # Adjust Lat/Lon to match Stochastic Model
-    lonm            = np.linspace(0,360,ds2.XC.shape[1])#ds2.XC#inds[0].lon
-    latm            = np.linspace(-90,90,ds2.YC.shape[0])#ds2.YC#inds[0].lat
-    coords          = dict(lat=latm,lon=lonm,)
-    ds2_martha      = xr.DataArray(np.flip(ds2.T2.data,0),coords=coords,dims=coords,name="T2")
-    ds2_martha      = proc.lon360to180_xr(ds2_martha)
-    ds2_martha      = proc.sel_region_xr(ds2_martha,[-80,0,0,90],verbose=True)
-    
-    # Coordinates were somehow messed up (by sel_region_xr code, or maybe before...)
-    ds2_martha = ds2_martha.sortby('lon')
-    ds2_martha = ds2_martha.sortby('lat')
-    
-else:
-    print("Loading T2 Computed from ERA5 by directly integrating Raw ACFs")
-    # Load NetCDFs for ERA5
-    nc_era5     = acfpath + "ERA5_NAtl_1979to2025_lag00to40_JFM_ensALL.nc"
-    acfs_era5   = xr.open_dataset(nc_era5).load()
-    
-    # For ERA5, just take the first 10 lags due to noise...
-    t2_era5 = proc.calc_T2(acfs_era5.acf.sel(lags=slice(0,10)).squeeze(),axis=-1,verbose=True,ds=True) # *dsmask
+print("Loading T2 Computed by Martha using AR-Fitting")
+fn              = "ERA5_T2_SSTwint_Martha.nc"
+ds2             = xr.open_dataset(dpath+fn).load()
 
-proc.printtime(st,"Loaded ACFs and calculated T2")
+# Adjust Lat/Lon to match Stochastic Model
+lonm            = np.linspace(0,360,ds2.XC.shape[1])#ds2.XC#inds[0].lon
+latm            = np.linspace(-90,90,ds2.YC.shape[0])#ds2.YC#inds[0].lat
+coords          = dict(lat=latm,lon=lonm,)
+ds2_martha      = xr.DataArray(np.flip(ds2.T2.data,0),coords=coords,dims=coords,name="T2")
+ds2_martha      = sut.lon360to180_xr(ds2_martha)
+ds2_martha      = sut.sel_region_xr(ds2_martha,[-80,0,0,90],verbose=True)
+
+# Coordinates were somehow messed up (by sel_region_xr code, or maybe before...)
+ds2_martha = ds2_martha.sortby('lon')
+ds2_martha = ds2_martha.sortby('lat')
+
+sut.printtime(st,"Loaded ACFs and calculated T2")
 
 #%% Visualize 1.A-C
 # This is the final version used in Figure 1 of the paper
@@ -409,28 +284,22 @@ fix_lat         = np.arange(45,70,5)
 mld_cbticks     = np.arange(0,600,100)
 t2_cbticks      = np.arange(1,5,1)
 
-fig,axs,_       = viz.init_orthomap(1,3,bbsel,figsize=(24,12),centlat=centlat,centlon=centlon)
+fig,axs,_       = sut.init_orthomap(1,3,bbsel,figsize=(24,12),centlat=centlat,centlon=centlon)
 
 for a,ax in enumerate(axs):
     ii              = a
-    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
+    ax              = sut.add_coast_grid(ax,bbox=bbsel,line_color='k',
                                         fill_color="lightgray",fontsize=fsz_tick,
                                         fix_lon=fix_lon,fix_lat=fix_lat)
     
-    # if a != 2:
-    #     continue
+    
     # Plot the t2
     if a == 1:
-        if use_marthas_t2:
-            plotvar     = ds2_martha 
-            lon         = ds2_martha.lon
-            lat         = ds2_martha.lat
-            #plotvar     = xr.where(ds2_martha == 1.31955576,1,0)
-            
-        else:
-            plotvar     = t2_era5.T
-            lon         = acfs_era5.lon 
-            lat         = acfs_era5.lat 
+
+        plotvar     = ds2_martha 
+        lon         = ds2_martha.lon
+        lat         = ds2_martha.lat
+
         
         cmap        = cm.devon_r#'cmo.dense'#cm.acton_r
         cints       = cints_t2 #np.arange(0,5.5,0.5)
@@ -474,11 +343,11 @@ for a,ax in enumerate(axs):
 
     
     if a == 0:
-        cb = viz.hcbar(cf,ax=ax,fontsize=22,pad=0.0001,fraction=0.040)
+        cb = sut.hcbar(cf,ax=ax,fontsize=22,pad=0.0001,fraction=0.040)
         cb.set_label(clab,fontsize=fsz_axis)
         cb.set_ticks(cbticks)
     elif a == 2:
-        cb = viz.hcbar(cf,ax=axs[1:].flatten(),fontsize=22,pad=0.0001,fraction=0.040)
+        cb = sut.hcbar(cf,ax=axs[1:].flatten(),fontsize=22,pad=0.0001,fraction=0.040)
         cb.set_label(clab,fontsize=fsz_axis)
         cb.set_ticks(cbticks)
     
@@ -488,8 +357,8 @@ for a,ax in enumerate(axs):
                       colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
     
     
-    bb = viz.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
-    viz.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+    bb = sut.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
+    sut.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
 
 figname = figpath + "Figure01_ABC_%s.png" % comparename 
 plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
@@ -501,13 +370,13 @@ plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
 era_sst           = ssts[id_era].squeeze()
 sm_sst_sel        = ssts[1]
 
-era_sst_ds = dsall[id_era]
-sm_sst_ds  = dsall[1]
+era_sst_ds        = dsall[id_era]
+sm_sst_ds         = dsall[1]
 
 ntime_sm    = len(sm_sst_sel)
 ntime_era   = len(era_sst)
-find_imin   = False #  Set to True to manually set value
-imin_in     = 713 * 12#80545 # Index of Minimum (user input, set find_imin to False to recalculate)
+find_imin   = False    #Set to True to manually set value
+imin_in     = 713 * 12 #80545 # Index of Minimum (user input, set find_imin to False to recalculate)
 lpcutoff    = 240
 
 if find_imin: # Find Location Time with Best Overlap via RMSE
@@ -521,13 +390,13 @@ if find_imin: # Find Location Time with Best Overlap via RMSE
         sstin            = sm_sst_sel[idxin]
         sstref           = era_sst
         if lpcutoff is not None:
-            sstin  = proc.lp_butter(sstin,lpcutoff,6)
-            sstref = proc.lp_butter(sstref,lpcutoff,6)
+            sstin  = sut.lp_butter(sstin,lpcutoff,6)
+            sstref = sut.lp_butter(sstref,lpcutoff,6)
             
         rmse_all[ii]  = np.sqrt(np.nanmean(sstin - sstref)**2)
         
     # Apply 12-month Low Pass Filter to RMSE to smooth out seasonal variability
-    rmsein = proc.lp_butter(rmse_all,12,6)
+    rmsein = sut.lp_butter(rmse_all,12,6)
     
     # Find minimum
     imin   = np.nanargmin(rmsein).item()
@@ -568,7 +437,7 @@ fig,ax1           = plt.subplots(1,1,constrained_layout=True,figsize=(14,4.5))
 # Plot ERA5 Timeseries
 ax      = ax1
 l1      = ax.plot(era_sst,label=expnames_long[-1],c=dfcol,lw=ts_lw)
-era_lp  = proc.lp_butter(era_sst,120,6)
+era_lp  = sut.lp_butter(era_sst,120,6)
 
 # Plot Stochastic Model Timeseries
 ax2 = ax.twiny()
@@ -624,11 +493,10 @@ if remove_topright:
     ax.spines[['right', 'top']].set_visible(False)
 
 # Label Subplot
-viz.label_sp(3,case='lower',ax=ax,y=1.2,x=-.1, fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+sut.label_sp(3,case='lower',ax=ax,y=1.2,x=-.1, fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
 
 figname = "%sFigure01D_Timeseries_%s_imin%i_lfp%03i.png" % (figpath,comparename,imin,lpcutoff)
-if darkmode:
-    figname = proc.addstrtoext(figname,"_darkmode")
+
 plt.savefig(figname,dpi=150,bbox_inches='tight',transparent=transparent)
 
 # =============================================================================
@@ -645,13 +513,13 @@ Additional Notes on Figure 2:
 ssts         = [ds.data for ds in ssts_ds]
 lags         = np.arange(61)
 nsmooths     = [4,] + [250,] * (nexps-1)
- #nsmooths     = [250,250,4]
-metrics_out  = scm.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
+
+metrics_out  = sut.compute_sm_metrics(ssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
 monstds      = [ss.groupby('time.month').std('time') for ss in ssts_ds]
 
 # Calculate Standard Deviations and Low-Pass Filtered Variance
 stds         = np.array([ds.std('time').data.item() for ds in ssts_ds])
-ssts_lp      = [proc.lp_butter(ts,120,6) for ts in ssts_ds]
+ssts_lp      = [sut.lp_butter(ts,120,6) for ts in ssts_ds]
 stds_lp      = np.array([np.std(ds) for ds in ssts_lp])
 vratio       = (stds_lp  / stds) * 100
 
@@ -667,7 +535,7 @@ mciter  = 10000
 ex      = 1
 pct     = 0.10
 
-eraspec_dict = scm.quick_spectrum([ssts[id_era],],[nsmooth,],pct,return_dict=True)
+eraspec_dict = sut.quick_spectrum([ssts[id_era],],[nsmooth,],pct,return_dict=True)
 
 stochmod_conts     = []
 
@@ -681,58 +549,32 @@ for ex in np.arange(nexps):
     stochmod_ts       = ssts[ex]
     
     #ntime_era         = len(ssts[id_era])
-    mcdict            = proc.mcsampler(stochmod_ts,ntime_era,mciter)
+    mcdict            = sut.mcsampler(stochmod_ts,ntime_era,mciter)
     stochmod_samples  = [mcdict['samples'][ii,:] for ii in range(mciter)]
     
-    stochmod_specdict = scm.quick_spectrum(stochmod_samples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
-    specdict_cont     = scm.quick_spectrum([stochmod_ts,],[250,]*mciter,pct,return_dict=True)
+    stochmod_specdict = sut.quick_spectrum(stochmod_samples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
+    specdict_cont     = sut.quick_spectrum([stochmod_ts,],[250,]*mciter,pct,return_dict=True)
     stochmod_conts.append(specdict_cont)
     mc_specdicts.append(stochmod_specdict)
 
-proc.printtime(st,"Bootstrapping calculations for spectra completed")
+sut.printtime(st,"Bootstrapping calculations for spectra completed")
 
 #%% Bootstrap for Standard Deviations
 
 st      = time.time()
 
-# Original Block Prior to Function Conversion --------------------------------
-# mcstds         = []
-# mcstds_lp      = []
-# monstds_sample = []
-# for ex in tqdm.tqdm(range(nexps)):
-    
-#     if ex == id_era:
-#         continue # Do not Bootstrap for ERA5
-    
-#     stochmod_ts         = ssts[ex]
-    
-#     mcdict              = proc.mcsampler(stochmod_ts,ntime_era,mciter)
-#     stochmod_samples    = [mcdict['samples'][ii,:] for ii in range(mciter)]
-    
-#     stochmod_samples_lp = [proc.lp_butter(ts,120,6) for ts in stochmod_samples]
-    
-#     # Reshape to mon x year then take standard deviation
-#     monstd_mc = np.array(stochmod_samples).reshape(mciter,int(ntime_era/12),12).std(1)
-    
-#     mcstds.append( np.nanstd(np.array(stochmod_samples),1) )
-#     mcstds_lp.append( np.nanstd(np.array(stochmod_samples_lp),1) )
-#     monstds_sample.append(monstd_mc)
-# Original Block Prior to Function Conversion --------------------------------
-    
 # Take Samples, Skipping ERA5
-mcstds,mcstds_lp,monstds_sample = mcsample_stdev_metrics(ssts[(id_era+1):],ntime_era,mciter)
+mcstds,mcstds_lp,monstds_sample = sut.mcsample_stdev_metrics(ssts[(id_era+1):],ntime_era,mciter)
     
-proc.printtime(st,"Bootstrapping calculations for monthly stdev completed")
+sut.printtime(st,"Bootstrapping calculations for monthly stdev completed")
 
 #%% Get Confidence Interval for ERA5
 
-n_eff           = proc.calc_dof(ssts[id_era],) # calculate effective dof
+n_eff           = sut.calc_dof(ssts[id_era],) # calculate effective dof
 
 # Get theoretical chi^2 PDF using n_eff-1
 xvariances      = np.linspace(0,1,100)
 era5var_pdf     = sp.stats.chi2.pdf(xvariances,n_eff-1,)#loc=stds[-1]**2)
-
-plt.plot(xvariances,era5var_pdf)
 
 nu      = n_eff -1 
 alpha   = 0.05
@@ -746,25 +588,6 @@ lowerbnd_era5 = np.sqrt(lower)
 upperbnd_era5 = np.sqrt(upper)
 
 #%% Set Up errorbars for barplot
-
-
-# Original Block Prior to Function Conversion --------------------------------
-# <SMIO PLOT RUN> -- Run this block for plotting
-# errbar_var      = np.zeros((2,nexps))
-# errbar_var_lp   = np.zeros((2,nexps))
-# mcstds_arr      = np.array(mcstds) # [exp,sample]
-# mcstds_lp_arr   = np.array(mcstds_lp)
-# ids_sm = np.arange(nexps)[(id_era+1):] # If ERA is first (reversed)
-# #ids_sm = np.arange(nexp)[:id_era] # If ERA is last one
-# lowervar        = np.abs(np.quantile(mcstds,0.025,axis=1) - stds[ids_sm]) # Can't be negative
-# uppervar        = np.quantile(mcstds,0.975,axis=1) - stds[ids_sm]
-# errbar_var[0,:] = np.hstack([[None,],lowervar,])
-# errbar_var[1,:] = np.hstack([[None,],uppervar,])
-# lowervar_lp = np.abs(np.quantile(mcstds_lp,0.025,axis=1) - stds_lp[ids_sm]) # Can't be negative
-# uppervar_lp = np.quantile(mcstds_lp,0.975,axis=1) - stds_lp[ids_sm]
-# errbar_var_lp[0,:] = np.hstack([[None,],lowervar_lp,])
-# errbar_var_lp[1,:] = np.hstack([[None,],uppervar_lp,])
-# Original Block Prior to Function Conversion --------------------------------
 
 errbar_var    = setup_errorbar(mcstds,stds[(id_era+1):],era5_last=False,include_era5=False)
 errbar_var_lp = setup_errorbar(mcstds_lp,stds_lp[(id_era+1):],era5_last=False,include_era5=False)
@@ -780,7 +603,7 @@ use_neff  = True
 conf      = 0.95
 alpha     = 0.15 #0.15
 
-monsfull = proc.get_monstr(nletters=None)
+monsfull = sut.get_monstr(nletters=None)
 xtks     = lags[::6]
 
 if nexps == 3:
@@ -792,7 +615,7 @@ for ii in range(2):
     ax     = axs[ii]
     kmonth = plotkmons[ii]
     
-    ax,ax2   = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+    ax,ax2   = sut.init_acplot(kmonth,xtks,lags,ax=ax,title="")
     
     for ex in range(nexps):
         
@@ -810,13 +633,13 @@ for ii in range(2):
                 label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5,zorder=zorder)
         
         if use_neff:
-            dof_in = proc.calc_dof(ssts[ex][kmonth::12])
+            dof_in = sut.calc_dof(ssts[ex][kmonth::12])
         else:
             dof_in = len(ssts[ex])/12
         
         print("%s for mon %i, DOF In = %.2f" % (expnames_long[ex],kmonth+1,dof_in))
         
-        cflag = proc.calc_conflag(plotvar,conf,2,dof_in)
+        cflag = sut.calc_conflag(plotvar,conf,2,dof_in)
         if ex == id_era:
             if darkmode:
                 alpha = 0.15
@@ -845,14 +668,13 @@ for ii in range(2):
     ax.set_title("")
     ax.set_ylabel("Correlation with \n %s Anomalies" % (monsfull[kmonth]),fontsize=fsz_tick)
     
-    viz.label_sp(ii,case='lower',alpha=0.15,ax=ax,y=1.28,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
+    sut.label_sp(ii,case='lower',alpha=0.15,ax=ax,y=1.28,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
                  weight='bold',fontcolor=dfcol)
     
     ax.tick_params(labelsize=fsz_ticks)
     
 figname = "%sFigure02_ACF_%s_PaperOutline.png" % (figpath,comparename)
-if darkmode:
-    figname = proc.darkname(figname)
+
 plt.savefig(figname,dpi=300,transparent=transparent)
 
 # =============================================================================
@@ -943,7 +765,7 @@ if remove_topright:
     ax.spines[['right', 'top']].set_visible(False)
 
 # Label Subplot
-viz.label_sp(0,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.45,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(0,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.45,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 
@@ -983,7 +805,7 @@ if remove_topright:
     ax.spines[['right', 'top']].set_visible(False)
 
 # Label Subplot
-viz.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 # --------------------------------- # Power Spectra
@@ -1048,7 +870,7 @@ for ii in range(nexps):
         alpha           = 0.05
         cloc_era        = [2e-2,6]
         dof_era         = metrics_out['dofs'][id_era]
-        cbnds_era       = proc.calc_confspec(alpha,dof_era)
+        cbnds_era       = sut.calc_confspec(alpha,dof_era)
         ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols[ii],alpha=0.05,zorder=1)
         #proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence (ERA5)") #+r" (dof= %.2f)" % dof_era)
     
@@ -1082,13 +904,11 @@ for ax in [ax,ax2]:
     ax.tick_params(labelsize=fsz_ticks)
 
 # Label Subplot
-viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 # Output Figure
 figname = "%sFigure03_SMHierarchy_Variance_%s.png" % (figpath,comparename)
-if darkmode:
-    figname = proc.darkname(figname)
 plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
 
 # =============================================================================
@@ -1101,7 +921,7 @@ Additional Notes on Figure 3:
 
 
 # Note: Data was loaded and area-averaged in the original script `cesm2_hierarchy_v_obs.py`
-outdir              = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/project_data/timeseries/"
+
 cesmnames           = ["FOM","MCOM","SOM"]
 
 cesmnames_long      = ["Full Ocean Model (1800 years)",
@@ -1118,15 +938,15 @@ cesmcols = [
 sst_cesm_raw = []
 for cc in range(3):
     expname = cesmnames[cc]
-    ncname = "%s/Area_Avg_CESM2_%s_%s.nc" % (outdir,expname,bbfn)
+    ncname = "%s/CESM2_%s_SST_SPGNE_Average.nc" % (dpath,expname)
     ds     = xr.open_dataset(ncname).TS.load()
     sst_cesm_raw.append(ds)
 
 #% Preprocess Data (Detrend and deseason)
 def preproc_cesm(ds):
-    ds      = proc.fix_febstart(ds)
-    dsa     = proc.xrdeseason(ds)
-    dsa_dt  = proc.xrdetrend(dsa)
+    ds      = sut.fix_febstart(ds)
+    dsa     = sut.xrdeseason(ds)
+    dsa_dt  = sut.xrdetrend(dsa)
     return dsa_dt
 
 sst_cesm_dt = [preproc_cesm(ds) for ds in sst_cesm_raw]
@@ -1134,12 +954,12 @@ sst_cesm_dt = [preproc_cesm(ds) for ds in sst_cesm_raw]
 # Compute Necessary Metrics
 nsmooths  = [250,100,100]
 cssts     = [sst.data for sst in sst_cesm_dt]
-cmetrics  = scm.compute_sm_metrics(cssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
+cmetrics  = sut.compute_sm_metrics(cssts,nsmooth=nsmooths,lags=lags,detrend_acf=False)
 
-cstd_metrics      = calc_stds_sample(cssts)
+cstd_metrics      = sut.calc_stds_sample(cssts)
 cvratio           = cstd_metrics[-1]
 
-#%% Compute Singificance of Spectra
+#%% Compute Significance of Spectra
 
 nsmooth = 4
 mciter  = 10000
@@ -1151,11 +971,11 @@ cesm_specdicts  = []
 for ex in range(3):
     cesm_ts       = cssts[ex]
     
-    mcdict        = proc.mcsampler(cesm_ts,ntime_era,mciter)
+    mcdict        = sut.mcsampler(cesm_ts,ntime_era,mciter)
     csamples      = [mcdict['samples'][ii,:] for ii in range(mciter)]
     
-    cesm_specdict = scm.quick_spectrum(csamples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
-    cesm_cont     = scm.quick_spectrum([cesm_ts,],[nsmooths[ex],]*mciter,pct,return_dict=True)
+    cesm_specdict = sut.quick_spectrum(csamples,[nsmooth,]*mciter,pct,return_dict=True,make_arr=True)
+    cesm_cont     = sut.quick_spectrum([cesm_ts,],[nsmooths[ex],]*mciter,pct,return_dict=True)
     
     cesm_conts.append(cesm_cont)
     cesm_specdicts.append(cesm_specdict)
@@ -1168,7 +988,7 @@ cstds_lp       = cstd_metrics[2]
 cmonstds_spgne =  [ ds.groupby('time.month').std('time') for ds in sst_cesm_dt]
 
 # Monte Carlo Computations for Standard Deviation Metrics
-cesm_mcstds,cesm_mcstds_lp,cesm_mc_monstds = mcsample_stdev_metrics(cssts,ntime_era,mciter)
+cesm_mcstds,cesm_mcstds_lp,cesm_mc_monstds = sut.mcsample_stdev_metrics(cssts,ntime_era,mciter)
 
 #%% Setup Error Bars for barplot
 
@@ -1258,7 +1078,7 @@ if remove_topright:
     ax.spines[['right', 'top']].set_visible(False)
 
 # Label Subplot
-viz.label_sp(0,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.45,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(0,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.45,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 #%
@@ -1295,7 +1115,7 @@ if remove_topright:
     ax.spines[['right', 'top']].set_visible(False)
 
 # Label Subplot
-viz.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(1,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.15,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 # --------------------------------- # Power Spectra
@@ -1369,7 +1189,7 @@ for ii in range(nexps):
         alpha           = 0.05
         cloc_era        = [2e-2,6]
         dof_era         = metrics_out['dofs'][id_era]
-        cbnds_era       = proc.calc_confspec(alpha,dof_era)
+        cbnds_era       = sut.calc_confspec(alpha,dof_era)
         ax.fill_between(plotfreq,cbnds_era[0]*plotspec,cbnds_era[1]*plotspec,color=expcols_cesm[ii],alpha=0.05,zorder=1)
         #proc.plot_conflog(cloc_era,cbnds_era,ax=ax,color=dfcol,cflabel=r"95% Confidence (ERA5)") #+r" (dof= %.2f)" % dof_era)
     
@@ -1402,13 +1222,12 @@ for ax in [ax,ax2]:
     ax.tick_params(labelsize=fsz_ticks)
 
 # Label Subplot
-viz.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
+sut.label_sp(2,case='lower',alpha=0.15,ax=ax,y=1.10,x=-.1,fig=fig,fontsize=fsz_title,labelstyle="%s",
              weight='bold',fontcolor=dfcol)
 
 # Output Figure
 figname = "%sFigure04_CESMHierarchy_Variance_%s.png" % (figpath,comparename)
-if darkmode:
-    figname = proc.darkname(figname)
+
 plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
 
 
@@ -1416,159 +1235,7 @@ plt.savefig(figname,dpi=300,transparent=transparent,bbox_inches='tight')
 #%% Supplemental Figures
 
 
-#%% Autocorrelation For Each Month
-
-#alpha = 0.001
-
-plot_im         = np.roll(np.arange(12),1)
-fig,axs         = plt.subplots(4,3,constrained_layout=True,figsize=(10,8))
-
-alphalist       = list(map(chr, range(97, 123)))
-alphalist_upper = [s.upper() for s in alphalist]
-dofs_eff        = np.zeros((nexps,12)) * np.nan
-
-fsz_splab = 12
-
-handles = [] # For legend
-for mm in range(12):
-    
-    ax     = axs.flatten()[mm]
-    kmonth = plot_im[mm]
-    lab    = "%s. %s" % (alphalist[mm],mons3[kmonth])
-    
-    viz.label_sp(lab,case='lower',alpha=0.15,ax=ax,x=0,fig=fig,fontsize=fsz_splab,labelstyle="%s",
-                 weight='bold',fontcolor=dfcol,usenumber=True)
-    
-    if mm == 10:
-        ax.set_xlabel("Lag (month)")
-    
-    # Plot ACFs (copied from above) ===========================================
-    for ex in range(nexps):
-        if ex == id_era:
-            col_in = dfcol
-        else:
-            col_in = expcols[ex]
-            
-        zorders = [9,9,2,2,]
-        zorder  = zorders[ex]
-        
-        plotvar = metrics_out['acfs'][kmonth][ex]
-        
-        lll = ax.plot(lags,plotvar,
-                label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5,zorder=zorder)
-        
-        # Calcualate Confidence Interval
-        if use_neff:
-            plotvar_mon = ssts[ex][kmonth::12]
-            dof_in      = proc.calc_dof(plotvar_mon,calc_r1=True,r1_in=None)
-            dofs_eff[ex,kmonth] = dof_in
-        else:
-            dof_in = len(ssts[ex])/12
-        cflag = proc.calc_conflag(plotvar,conf,2,dof_in)
-        if ex == 2:
-            if darkmode:
-                alpha = 0.15
-            else:
-                alpha = 0.05
-        else:
-            alpha = 0.10
-        
-        ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
-        if mm == 0:
-            handles.append(lll[0]) # Need to take first element of list for handle
-        
-    # =========================================================================
-    
-    ax.set_xlim([0,60])
-    ax.set_ylim([-0.25,1.25])
-    ax.set_xticks(np.arange(0,66,6))
-    ax.set_yticks(np.arange(0,1.25,0.25))
-    ax.axhline([0],ls='dashed',c='k',lw=0.55)
-
-
-axs[0,0].set_ylabel("Correlation")
-
-fig.legend(handles,expnames_long,bbox_to_anchor=(0.5, 1.03),loc ='center',ncol=4)
-
-figname = "%sFigureS00_ACF_%s_neff%i_AllMonths.png" % (figpath,comparename,use_neff)
-plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight') 
-
-
-
-
-
-
-#%%
-
-
-
-bins    = np.arange(0,0.61,0.01)
-
-    
-fig,axs = plt.subplots(3,2,constrained_layout=True,figsize=(10,6))
-
-iilab = [0,4,1,5,2,]
-ii    = 0
-for iex in range(3):
-    
-    ex = iex + 1
-    
-    
-    for vv in range(2):
-        
-        if vv == 0: # Raw
-            mcstds_in = mcstds
-            stds_in   = stds
-            xlm       = [0.25,0.60]
-            xlab      = "$\sigma(SST)$"
-            
-        else:       # LP Filter
-            mcstds_in = mcstds_lp
-            stds_in   = stds_lp
-            xlm       = [0,0.50]
-            xlab      = "10-year LP Filtered $\sigma(SST)$"
-        
-    
-        
-        ax = axs[iex,vv]
-        
-        ax.hist(mcstds_in[iex],bins=bins,color=expcols[ex],edgecolor='w',density=True)
-        
-        bnds = np.quantile(mcstds_in[iex],[0.025,0.975])
-        mu   = np.nanmean(mcstds_in[iex])
-        
-        ax.axvline(stds_in[-1],color="k",label="Obs. = %.2f" % stds_in[-1])
-        
-        
-        
-        ax.axvline(stds_in[iex],color="blue",label="$\mu$ (Full Timeseries) = %.2f" % stds_in[iex])
-        ax.axvline(mu,label="$\mu$ (Samples)= %.2f" % mu,ls='solid',color='gray')
-        cflab = r"95%% Bounds: [%.2f, %.2f]" % (bnds[0],bnds[1])
-        ax.axvline(bnds[0],label=cflab,ls='dashed',color="gray")
-        ax.axvline(bnds[1],label="",ls='dashed',color="gray")
-        
-        ax.set_xlim(xlm)
-        ax.set_ylim([0,25])
-        ax.legend()
-        
-        # csfit   = sp.stats.chi2.fit(mcstds[1])
-        # pdftheo = sp.stats.chi2.pdf(bins,df=csfit[0])
-        # ax.plot(bins,pdftheo)
-        if ex == 1:
-            ax.set_xlabel("%s [$\degree$ C]" % xlab)
-        
-        if vv == 0:
-            ax.set_ylabel("Frequency\n%s" % expnames_short[ex])
-    
-        #viz.label_sp(ii,ax=ax,fig=fig)
-        viz.label_sp(ii,case='lower',ax=ax,fig=fig,fontsize=fsz_axis,labelstyle="%s",weight='bold')
-        
-        ii += 1
-
-figname = "%sSuppMC_Test_Stochastic_Model_Stdev_%s.png" % (figpath,comparename)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
-
-#%% Plot t2 for other simulations
+#%% Plot t2 for other simulations (Figure S1)
 
 pmesh           = False
 fsz_axis        = 22
@@ -1595,14 +1262,14 @@ fix_lat         = np.arange(45,70,5)
 mld_cbticks     = np.arange(0,600,100)
 t2_cbticks      = np.arange(1,5,1)
 
-fig,axs,_       = viz.init_orthomap(1,2,bbsel,figsize=(20,12),centlat=centlat,centlon=centlon)
+fig,axs,_       = sut.init_orthomap(1,2,bbsel,figsize=(20,12),centlat=centlat,centlon=centlon)
 
 plot_ex = [1,2]
 
 
 for a,ax in enumerate(axs):
     ii              = a
-    ax              = viz.add_coast_grid(ax,bbox=bbsel,line_color='k',
+    ax              = sut.add_coast_grid(ax,bbox=bbsel,line_color='k',
                                         fill_color="lightgray",fontsize=fsz_tick,
                                         fix_lon=fix_lon,fix_lat=fix_lat)
     
@@ -1639,11 +1306,11 @@ for a,ax in enumerate(axs):
                       colors='cyan',linewidths=4,transform=proj,linestyles='dotted')
     
     
-    bb = viz.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
-    viz.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
+    bb = sut.plot_box(bbox_spgne,ax=ax,color='purple',linewidth=4.5,proj=proj)
+    sut.label_sp(a,case='lower',ax=ax,fig=fig,fontsize=fsz_title,labelstyle="%s",weight='bold')
     
     
-cb = viz.hcbar(cf,ax=axs.flatten(),fontsize=22,pad=0.0001,fraction=0.040)
+cb = sut.hcbar(cf,ax=axs.flatten(),fontsize=22,pad=0.0001,fraction=0.040)
 cb.set_label(clab,fontsize=fsz_axis)
 cb.set_ticks(cbticks)
 
@@ -1651,199 +1318,85 @@ cb.set_ticks(cbticks)
 figname = figpath + "FigureS1_T2_SM_%s.png" % comparename 
 plt.savefig(figname,dpi=300,bbox_inches='tight',transparent=transparent)
 
-#%% Figure S2
-# Copief form analyze_amoc_index_local.py
-# =======================
-# %% Load data
-# =======================
+#%% Figure S2 Autocorrelation For Each Month
 
-# Load the netCDF
-amocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/proc/"
-amocnc = "MOC_merge_0to90.nc"
-st = time.time()
-dsmoc = xr.open_dataset(amocpath+amocnc).load()
-proc.printtime(st, print_str="loaded in")
+#alpha = 0.001
 
+plot_im         = np.roll(np.arange(12),1)
+fig,axs         = plt.subplots(4,3,constrained_layout=True,figsize=(10,8))
 
-# Load SST
-st = time.time()
-sstnc = "CESM2_FCM_PiControl_TS_0000_2000_raw.nc"
-sstpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/NAtl/Old/"
-dsst = xr.open_dataset(sstpath+sstnc).load()
-proc.printtime(st, print_str="loaded in")
+alphalist       = list(map(chr, range(97, 123)))
+alphalist_upper = [s.upper() for s in alphalist]
+dofs_eff        = np.zeros((nexps,12)) * np.nan
 
+fsz_splab = 12
 
-# Load N_HEAT
-nheat_path = "/Users/gliu/Globus_File_Transfer/CESM2_PiControl/N_HEAT/"
-nclist = glob.glob(nheat_path + "*.nc")
-nclist.sort()
-
-dsnheat = xr.open_mfdataset(nclist, concat_dim='time', combine='nested')
-dsnheat = dsnheat.sel(lat_aux_grid=slice(0, 90)).isel(
-    transport_reg=1, transport_comp=1)
-keepvars = ["N_HEAT", "time",
-            # "transport_regions","transport_components",
-            "transport_reg",
-            "moc_z", "lat_aux_grid",
-            "TLAT", "z_t"]
-dsnheat = proc.ds_dropvars(dsnheat, keepvars).load()
-
-#%%
-
-def preprocess_ds(ds):
-
-    dsa = proc.xrdeseason(ds)
-
-    dsa = proc.xrdetrend(dsa)
-    dsa = proc.fix_febstart(dsa)
-
-    return dsa
-
-# Transport Components
-comps = [b'Total', b'Eulerian-Mean Advection',
-         b'Eddy-Induced Advection (bolus) + Diffusion',
-         b'Eddy-Induced (bolus) Advection', b'Submeso Advection']
-
-icomp = 0
-moca   = preprocess_ds(dsmoc.isel(moc_comp=icomp).MOC)
-ssta   = preprocess_ds(dsst.TS)
-nheata = preprocess_ds(dsnheat.N_HEAT)
-latamoc = moca.lat_aux_grid
-
-# %% Calculate AMOC Index by latitude (max depth)
-
-# Basically taking the absolute maximum, keeping the sign... (prob smarter way to do this)
-mocmax = moca.max('moc_z')
-mocmin = moca.min('moc_z')
-amocidx = xr.where(np.abs(mocmax) > np.abs(mocmin), mocmax, mocmin)
-
-# amocidx     = moca.max('moc_z')  # [Time x Latitude]
-maxdepth = moca.idxmax('moc_z')/100
-bbox_spgne = [-40, -15, 52, 62]
-
-# Calculate Area-averaged SPGNE Index
-sstreg = proc.sel_region_xr(ssta, bbox_spgne)
-spgneid = proc.area_avg_cosweight(sstreg)
-
-
-
-
-#%%%
-
-# Take Annual Average of each quantity
-def annavg_ds(ds):
-    return ds.groupby('time.year').mean('time')
-
-
-spgneid_ann = annavg_ds(spgneid)
-# amocidxa        = amocidx.groupby('time.month') - amocidx.groupby('time.month').mean('time')
-amocidx_ann = annavg_ds(amocidx)
-nheata_ann = annavg_ds(nheata)
-
-# amocidx_ann_rs  = moca.max('moc_z').resample()
-
-#%%
-
-leadlags_ann = np.arange(-20, 21, 1)
-
-filtin = None#10
-both_filt = False
-border = 6
-
-_, nlat = amocidx_ann.shape
-
-if filtin is None:
-    spgin = spgneid_ann.data
-else:
-    spgin = proc.lp_butter(spgneid_ann.data, filtin, border)
-
-nleadlags = len(leadlags_ann)
-amoc_corrs_ann = np.zeros((nlat, nleadlags))
-nheat_corrs_ann = amoc_corrs_ann.copy()
-
-for a in tqdm.tqdm(range(nlat)):
-
-    amocin = amocidx_ann[:, a].data
-    nheatin = nheata_ann[:, a].data
-
-    # Note: Doesnt make sense to deseason as already annual data
-    # amocin    = proc.xrdeseason(amocidx_ann[:,a]).data
-    # nheatin   = proc.xrdeseason(nheata_ann[:,a].data)
-
-    if both_filt and filtin is not None:
-        amocin = proc.lp_butter(amocin, filtin, border)
-        nheatin = proc.lp_butter(nheatin, filtin, border)
-
-    amoclags = calc_lag_corr_1d(amocin, spgin, leadlags_ann)
-    nheatlags = calc_lag_corr_1d(nheatin, spgin, leadlags_ann)
-
-    amoc_corrs_ann[a, :] = amoclags.copy()
-    nheat_corrs_ann[a, :] = nheatlags.copy()
+handles = [] # For legend
+for mm in range(12):
     
-#%% Make PLot
-
-lww = 3
-fig, ax = plt.subplots(1, 1, constrained_layout=True, figsize=(8, 4))
-xtks = np.arange(0, 95, 5)
-msz = 5
-
-def maxlat(ds): return latamoc[ds.argmax()].data
-
-
-# N_HEAT ---
-iiname  = "N_HEAT"
-nheatcol = 'salmon'
-plotvar = nheat_corrs_ann.max(1)**2
-mlat = maxlat(plotvar)
-maxval = np.nanmax(plotvar)
-ax.plot(latamoc, plotvar,
-        label="r2 of Northward Heat Transport and SPGNE SST,max=%.2f @ $%.2f \degree N$" % (
-            maxval, mlat),
-        color='salmon', lw=lww)
-#ax.axvline([mlat], c=nheatcol)
-
-ax.spines['right'].set_color(nheatcol)
-ax.yaxis.label.set_color(nheatcol)
-ax.tick_params(axis='y', colors=nheatcol)
-
-
-lagcol = 'cornflowerblue'
-ax2 = ax.twinx()
-ax2.tick_params(labelsize=14)
-ax2.set_label("Lag of Maximum $r^2$")
-plotvar = leadlags_ann[nheat_corrs_ann.argmax(1)]
-ax2.scatter(latamoc, plotvar, marker='d', c=lagcol, s=2)
-ax2.set_yticks(np.arange(-20, 2, 2))
-
-
-ax2.spines['right'].set_color(lagcol)
-ax2.set_ylabel("Lag of Maximum $r2$")
-ax2.yaxis.label.set_color(lagcol)
-ax2.tick_params(axis='y', colors=lagcol)
-
-
-# plotvar = nheat_corrs.max(1)**2
-# mlat    = maxlat(plotvar)
-# maxval  = np.nanmax(plotvar)
-# ax.plot(lat,plotvar,label="N_HEAT Transport (Monthly), max=%.1f%% @ $%.2f \degree N$" % (maxval*100,mlat),color='salmon',ls='dashed',lw=lww)
-# ax.axvline([mlat],c='salmon',ls='dashed')
-
-ax.set_ylim([-0.25, 1.25])
-ax.set_ylabel("$r^2$", fontsize=14)
-ax.set_xlabel("Latitude", fontsize=14)
-ax.axvline([52], c='magenta', ls='dotted',label="SPGNE Box")
-ax.axvline([62], c='magenta', ls='dotted')
-ax.axhline([0], c='k', ls='solid', lw=0.5)
-ax.axhline([1], c='k', ls='solid', lw=0.5)
-ax.set_xlim([xtks[0], xtks[-1]])
-#ax.set_title("Maximum $r^2$ By Latitude (%s)" % lab)
-ax.tick_params(labelsize=14)
-
-ax.legend(ncol=2, fontsize=12,loc='upper center',frameon=True,bbox_to_anchor=(0.02, 1.1, 1., .102))
+    ax     = axs.flatten()[mm]
+    kmonth = plot_im[mm]
+    lab    = "%s. %s" % (alphalist[mm],mons3[kmonth])
+    
+    sut.label_sp(lab,case='lower',alpha=0.15,ax=ax,x=0,fig=fig,fontsize=fsz_splab,labelstyle="%s",
+                 weight='bold',fontcolor=dfcol,usenumber=True)
+    
+    if mm == 10:
+        ax.set_xlabel("Lag (month)")
+    
+    # Plot ACFs (copied from above) ===========================================
+    for ex in range(nexps):
+        if ex == id_era:
+            col_in = dfcol
+        else:
+            col_in = expcols[ex]
+            
+        zorders = [9,9,2,2,]
+        zorder  = zorders[ex]
+        
+        plotvar = metrics_out['acfs'][kmonth][ex]
+        
+        lll = ax.plot(lags,plotvar,
+                label=expnames_long[ex],color=col_in,ls=expls[ex],lw=2.5,zorder=zorder)
+        
+        # Calcualate Confidence Interval
+        if use_neff:
+            plotvar_mon = ssts[ex][kmonth::12]
+            dof_in      = sut.calc_dof(plotvar_mon,calc_r1=True,r1_in=None)
+            dofs_eff[ex,kmonth] = dof_in
+        else:
+            dof_in = len(ssts[ex])/12
+        cflag = sut.calc_conflag(plotvar,conf,2,dof_in)
+        if ex == 2:
+            if darkmode:
+                alpha = 0.15
+            else:
+                alpha = 0.05
+        else:
+            alpha = 0.10
+        
+        ax.fill_between(lags,cflag[:,0],cflag[:,1],alpha=alpha,color=col_in,zorder=3)
+        if mm == 0:
+            handles.append(lll[0]) # Need to take first element of list for handle
+        
+    # =========================================================================
+    
+    ax.set_xlim([0,60])
+    ax.set_ylim([-0.25,1.25])
+    ax.set_xticks(np.arange(0,66,6))
+    ax.set_yticks(np.arange(0,1.25,0.25))
+    ax.axhline([0],ls='dashed',c='k',lw=0.55)
 
 
- #loc='lower left')
+axs[0,0].set_ylabel("Correlation")
 
-figname = "%sFigS2_%s_SPGNE_LagvLat_AnnComparison_Draft3Ver_fit%s_bothfilt%i.png" % (
-    figpath, iiname, str(filtin), both_filt)
-plt.savefig(figname, dpi=150, bbox_inches='tight')
+fig.legend(handles,expnames_long,bbox_to_anchor=(0.5, 1.03),loc ='center',ncol=4)
+
+figname = "%sFigureS00_ACF_%s_neff%i_AllMonths.png" % (figpath,comparename,use_neff)
+plt.savefig(figname,dpi=150,transparent=transparent,bbox_inches='tight') 
+
+
+
+
+
+
