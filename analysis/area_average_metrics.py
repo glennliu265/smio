@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+        #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 
@@ -110,7 +110,7 @@ def plot_ice_ssh(fsz_ticks=20-2,label_ssh=False):
 #%% Further User Edits (Set Paths, Load other Data)
 
 # Set Paths
-figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260219/"
+figpath         = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/02_Figures/20260902/"
 sm_output_path  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
 proc.makedir(figpath)
 
@@ -333,6 +333,36 @@ expls           = ['dotted',
 #                    'dashed',
 #                    'solid']
 
+# (14) GRL Draft, Checking GOSML Sensitivity
+comparename     = "GRL_Check_GOSML"
+expnames        = ["SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL",
+                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL",
+                   "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL",
+                   "SST_GOSML_Test_Level3",
+                   "SST_ERA5_1979_2024"]
+
+expnames_long   = ["Level 1 (SOM)",
+                   "Level 2 (Entrainment Damping)",
+                   "Level 3 (Entrainment Damping + Re-emergence)",
+                   "Level 3 (GOSML)",
+                   "Observations (ERA5)"]
+expnames_short  = ["Level 1",
+                   "Level 2",
+                   "Level 3",
+                   "Level 3 GOSML",
+                   "Obs."]
+expcols         = ["salmon",
+                   "goldenrod",
+                   "turquoise",
+                   "purple",
+                   "k"]
+expls           = ['dotted',
+                   'dashed',
+                   'dashed',
+                   'dashdot',
+                   'solid']
+
+
 detect_blowup   = True
 
 
@@ -488,7 +518,7 @@ for kmonth in range(13):
 
 
 
-#%% Plot ACF
+#%% Plot ACF (All Months)
 kmonth = 1
 xtks   = lags[::6]
 conf   = 0.95

@@ -24,12 +24,27 @@ import glob
 import scipy as sp
 import cartopy.crs as ccrs
 from scipy.io import loadmat
+import os
+
+
+# ----------------------------------
+#%% Import custom modules and paths
+# ----------------------------------
+
+# Indicate the Machine!
+machine = "Astraeus"
+
 
 
 #%% stormtrack modules
 
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
+if machine == "stormtrack":
+    amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
+    scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
+elif machine == "Astraeus":
+    amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
+    scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
+
 
 sys.path.append(amvpath)
 sys.path.append(scmpath)
@@ -42,7 +57,10 @@ import amv.loaders as dl
 #%% User Edits: Set up Region Average Directory
 
 # Indicate Path to Area-Average Files
-dpath_aavg      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/05_SMIO/data/region_average/"
+if machine == "stormtrack":
+    dpath_aavg      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/05_SMIO/data/region_average/"
+elif machine == "Astraeus":
+    dpath_aavg      = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/region_average/"
 regname         = "SPGNE"
 bbsel           = [-40,-15,52,62]
 
@@ -74,21 +92,26 @@ outformat = "%s%s_%s_%04d_%04d_%s.nc"
 
 # If smoutput is <True>... ----------------------------------------------------
 # Use sm loader and output path to metrics folder
-expname            ="SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar" #"SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
+expname            = "SST_GOSML_Test_Level3" #"SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL_MLDvar" #"SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL" #"SST_ORAS5_avg_GMSST" #"SST_ORAS5_avg_EOF" #"SST_ORAS5_avg_mld003" #"SST_ORAS5_avg" #"SST_ERA5_1979_2024"
 vname              = "SST"
 concat_dim         = "time"
 detect_blowup      = True
 blowup_thres       = 1e2
 
 if smoutput:
-    sm_output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+    
+    if machine == "stormtrack":
+        
+        sm_output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+    elif machine == "Astraeus":
+        sm_output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
     outpath        = "%s%s/Metrics/" % (sm_output_path,expname) # Save into experiment directory
     # Output path to "Metrics" Folder of stochastic model output...
     outname = "%sArea_Avg_%s.nc" % (outpath,bbfn)
     
 else:
     # Otherwise specify an ncsearch
-    
+    print("Warning, only stormtrack paths supported for non Stochastic Model Output...")
     # CESM2_POM3_PiControl_SHF_0100_0500_raw.nc ~~~~~~~~~~~~~~~~
     concat_dim = "time"
     vname      = "TS"
@@ -169,6 +192,7 @@ for ff in tqdm.tqdm(range(nfiles)):
     
     ncname        = nclist[ff]
     ds            = xr.open_dataset(ncname)
+    #print(ds)
     
     
     if detect_blowup:
