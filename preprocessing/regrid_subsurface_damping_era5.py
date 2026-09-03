@@ -21,7 +21,7 @@ import cartopy.crs as ccrs
 
 #%% Load Files
 
-dataset_name = "ORAS5_avg" #"ORAS5_avg_mld003"
+dataset_name = "ORAS5_avg_GOSML" #"ORAS5_avg_mld003"
 detrend      = "GMSSTmon"
 
 #"oras5_mld_clim_cds"
@@ -100,6 +100,21 @@ elif dataset_name == "ORAS5_avg_mld003":
     ncout  = "ORAS5_avg_mld003_ORAS5mld003_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
     ncin    = ncname + ncout
     ds_in     = xr.open_dataset(ncin)
+    
+    tlat = ds_in.TLAT.data
+    tlon = ds_in.TLONG.data
+    bbox = [np.nanmin(tlon.flatten()),
+            np.nanmax(tlon.flatten()),
+            np.nanmin(tlat.flatten()),
+            np.nanmax(tlat.flatten())]
+    vname = "lbd_d"
+
+elif dataset_name == "ORAS5_avg_GOSML":
+    
+    ncname  = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    ncout   = "ORAS5_avg_GOSML_corr_d_TEMP_detrendGMSSTmon_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024.nc"
+    ncin    = ncname + ncout
+    ds_in   = xr.open_dataset(ncin)
     
     tlat = ds_in.TLAT.data
     tlon = ds_in.TLONG.data

@@ -187,11 +187,20 @@ def calc_monthly_eof(daf,bboxeof,N_mode=None,concat_ens=True,mask=None,bbox_chec
     
     return ds_eof.squeeze()
 
-#%% Load Fprime for ERA5
+#%% Indicate File
 
-# Load Fprime
+# Load Fprime (original)
 fpath           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
 fnc             = "ERA5_Fprime_QNET_timeseries_QNETgmsst_nroll0_NAtl.nc"#"ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
+
+# Load Fprime with GOSML MLD (2026.09.02)
+fpath           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+fnc             = "ERA5_Fprime_QNET_GOSML_timeseries_QNETgmsstMON_GOSML_nroll0_NAtl.nc"#"ERA5_Fprime_QNET_timeseries_QNETpilotObsAConly_nroll0_NAtl.nc"
+
+
+
+#%% Load Fprime for ERA5
+# Load Fprime
 ds_fprime       = xr.open_dataset(fpath + fnc).load()
 
 # Load Ice Mask
@@ -223,7 +232,6 @@ eof_out    = calc_monthly_eof(ds_fprime.Fprime.squeeze(),bboxeof,N_mode=N_mode,m
 #%% Perform filtering and correction
 # Copied format from [reemergence/preprocessing/correct_eof_forcing_SSS]
 # Wrote a function that takes output of "calc_monthly_eof" and performs filtering + correction
-
 
 target_var = ds_fprime.Fprime
 eof_thres  = 0.90
@@ -297,7 +305,6 @@ filt_out = filt_out.rename(dict(eofs="Fprime"))
 
 
 #%% Save the full forcing file
-
 
 fpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 fname = "%s%s_EOFFilt%03i_corrected.nc" % (fpath,fnc[:-3],eof_thres*100)

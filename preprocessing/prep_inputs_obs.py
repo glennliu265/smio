@@ -312,18 +312,34 @@ viz.hcbar(pcm)
 # ================================
 
 
+# MIMOC Dataset
+mld_dataset    = "GOSML" #"MIMOC"
 
-dpath_proc = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-ncname     = dpath_proc + "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
-ds_mld     = xr.open_dataset(ncname).load()
+if mld_dataset == "MIMOC":
+    dpath_proc = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+    ncname     = dpath_proc + "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
+    ds_mld     = xr.open_dataset(ncname).load()
+    
+    ds_mld     = ds_mld.rename(dict(mld='h'))
+    ds_mld     = ds_mld.rename(dict(month='mon'))
+    
+    outpath_h  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+    outname    = outpath_h + "MIMOC_regridERA5_h_pilot.nc"
+    
+elif mld_dataset == "GOSML":
+    dpath_proc = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+    ncname     = dpath_proc + "GOSML_RegridERA5_mld_Climatology.nc"
+    ds_mld    = xr.open_dataset(ncname).load()
+    
+    ds_mld     = ds_mld.rename(dict(mld='h'))
+    ds_mld     = ds_mld.rename(dict(month='mon'))
+    
+    outpath_h  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+    outname    = outpath_h + "GOSML_regridERA5_h_pilot.nc"
 
-ds_mld     = ds_mld.rename(dict(mld='h'))
-ds_mld     = ds_mld.rename(dict(month='mon'))
-
-outpath_h  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
-outname    = outpath_h + "MIMOC_regridERA5_h_pilot.nc"
 edict      = proc.make_encoding_dict(ds_mld)
 ds_mld.to_netcdf(outname,encoding=edict)
+
 
 #%% Compute Kprev
 
@@ -342,7 +358,7 @@ print("Completed kprev calc in %.2fs" % (time.time()-st))
 
 kprevall   = kprevall.transpose('mon','lat','lon').rename(dict(h='kprev'))
 edict      = proc.make_encoding_dict(kprevall)
-outname    = outpath_h + "MIMOC_regridERA5_kprev_pilot.nc"
+outname    = outpath_h + "%s_regridERA5_kprev_pilot.nc" % mld_dataset
 kprevall.to_netcdf(outname,encoding=edict)
 
 #%%

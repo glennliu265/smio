@@ -13,6 +13,9 @@ Update [2025.07.01], support ORAS5 Calculations
 
 Update [2025.07.09], Add ORAS5 2019-2025 with toggle
 
+Update [2026.09.02], Add ORAS5 + GOSML support...
+    - Added Toggle for calc_acf and Calc_corr_d steps
+
 Created on Tue Jun 24 13:10:54 2025
 
 @author: gliu
@@ -104,14 +107,21 @@ ORAS5_avg_mld003
 - ORAS5 MLD 0.03 threshold
 - Same votemper as ORAS5_avg
 
+Note: 
+    - MIMOC is supported for all datasets above
+    - GOSML currently only supported for ORAS5_avg
+     see: [regrid_GOSML_ERA5.py], need to regrid to other products...
 
 """
 
 
-dataset_name ="ORAS5_avg"  #"ORAS5_avg_mld003" # EN4 # Indicate which Dataset
+dataset_name = "ORAS5_avg"  #"ORAS5_avg_mld003" # EN4 # Indicate which Dataset
+mldname      = "GOSML" # "MIMOC
+calc_acf     = False
 
+if mldname == "GOSML":
+    print("Warning: GOSML currently only supported for dataset_name=ORAS5_avg")
 
-mldname = "MIMOC"
 
 st = time.time()
 if dataset_name == "EN4":
@@ -172,18 +182,28 @@ elif dataset_name == "ORAS5_avg" or "ORAS5_avg_mld03":
         mldname  = "ORAS5mld003"
         
     else:
-        print("Loading MLDs from MIMOC")
-        # Load MIMOC (ERA5 Resolution)
+        # Share same mld path for now
         mimocpath = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
-        mimocnc   = "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
-        ds_mld    = xr.open_dataset(mimocpath + mimocnc).load()
+        if mldname == "MIMOC":
+            print("Loading MLDs from MIMOC")
+            # Load MIMOC (ERA5 Resolution)
+            
+            mimocnc   = "MIMOC_RegridERA5_mld_NAtl_Climatology.nc"
+            ds_mld    = xr.open_dataset(mimocpath + mimocnc).load()
+        else:
+            print("Loading MLDs from GOSML")
+            gosml_nc = "GOSML_RegridERA5_mld_Climatology.nc"
+            ds_mld   = xr.open_dataset(mimocpath + gosml_nc).load()
+            #ds_mld   = ds_mld.rename(dict(month='mon'))
+            
+            
     
     
     # Set Cropping Time Period
     tstart = 1979
     tend   = 2024
     bbcalc = [-80,0,0,65]
-   # bbcalc = [-40,-15,52,62]
+    # bbcalc = [-40,-15,52,62]
     
     ds_temp = ds_temp.rename(dict(z_t='depth'))
     
@@ -218,7 +238,6 @@ lagmax  = 3
 # detrend = 'ensmean'
 detrend = "GMSSTmon" #'gmsst' # Set to None to do a linear detrend
 
-
 #%% First, restrict MLD and calculate kprev
 
 # Slice to region (MLD)
@@ -230,14 +249,13 @@ except:
     print("Lon not found, trying curvilinear region selection...")
     ds_mld = proc.sel_region_xr_cv(ds_mld,bbcalc)
     
-
+    
 # Slice to time (TEMP)
 ds_temp = ds_temp.sel(time=slice("%04i-01-01" % tstart,"%04i-12-31" % tend)) # [time x depth x lat x lon]
 
 # Slice to region (TEMP)
 if "TLONG" in ds_temp.coords:
     ds_temp = proc.sel_region_xr_cv(ds_temp,bbcalc,debug=False)
-    
     
 
 # Slice to max MLD Depth (take first level that exceeds deepest)
@@ -255,13 +273,13 @@ print("This is between %i (%.2f) and %i (%.2f) in %s" % (idx_deeper-1,en4depths.
                                                           ))
 ds_temp = ds_temp.isel(depth=slice(0,idx_deeper+1))
 
-
-
 #%% Reprocess and detrend (took 82 sec for NATL ORAS5, 2.36 sec for SPGNE)
+
 
 dtvar_anom = proc.xrdeseason(ds_temp)
 dsa        = dtvar_anom
 vname      = "TEMP"
+
 if detrend == "linear" or detrend == "1": # (1): Simple Linear Detrend (9.68s)
     dsadt    = proc.xrdetrend(dsa)
 elif detrend == "linearmon":
@@ -326,119 +344,144 @@ else:
 
 #%% Calculate the ACF and detrainment (timescale-based)
 
-lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
-tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
-acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
-acf_mon_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Actual ACF
-
-
-for o in tqdm.tqdm(range(nlon)):
-    for a in range(nlat):
-        
-        # Retrieve variable at point
-        varpt = dtvar_yrmon[:,:,:,a,o].copy() # Yr x Mon x Depth
-        if np.all(np.isnan(varpt)):
-            continue # Skip the Point because it is on land
-        
-        # Debugging ====
-        #plt.pcolormesh(np.arange(nyr),dtvar_anom.depth,varpt[:,0,:].T,vmin=-1.5,vmax=1.5,cmap='RdBu_r'),plt.colorbar()
-        
-        depthsum = np.sum(varpt,(0,1))
-        idnan_z  = np.where(np.isnan(depthsum))[0]
-        varpt[:,:,idnan_z] = 0 # Set to Zeros
-        
-        
-        # Retrieve Mixed layer depth cycle at a point
-        if coords2D:
-            lonf = lon[a,o]
-            latf = lat[a,o]
-        else:
-            lonf = lon[o]
-            latf = lat[a]
-        if lon360_flag and lonf > 180:
-            print("Converting Longitude to degrees West")
-            lonf = lonf - 360
-        
-        if mld2d:
-            hpt  = proc.find_tlatlon(ds_mld,lonf,latf,verbose=False).mld
-        else:
-            hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
-        if np.any(np.isnan(hpt)):
-            continue
-        
-        # Section here is taken from calc_detrainemtn_damping_pt -------------
-        # Input Data
-        ts_monyr     = varpt.transpose(1,0,2)        # Anomalies [mon x yr x otherpts (z)]
-        hclim        = hpt                           # MLD Cycle [mon]
-        
-        # (1) Estimate ACF
-        acfs_mon = calc_acf_ens(ts_monyr,lags) # [mon x lag x depth]
-        acfs_mon[:,:,idnan_z] = 0 # To Avoid throwing an error
-        
-        # (2) Fit Exponential Func
-        tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
-        
-        # (3) Compute Detraiment dmaping
-        kprev,_ = scm.find_kprev(hclim)
-        lbd_d   = scm.calc_tau_detrain(hclim,kprev,z,tau_est,debug=False)
-        
-        # Correct zeros back to nans
-        acfs_mon[:,:,idnan_z] = np.nan
-        tau_est[:,idnan_z] = np.nan
-        acf_est[:,:,idnan_z] = np.nan
-        
-        # Save Output
-        lbd_d_all[:,a,o]       = lbd_d.copy()
-        tau_est_all[:,:,a,o]   = tau_est.copy()
-        acf_est_all[:,:,:,a,o] = acf_est.copy()
-        acf_mon_all[:,:,:,a,o] = acfs_mon.copy()
-        
-#%% Check the output
-
-
-mons       = np.arange(1,13,1)
-nlat       = np.arange(0,nlat)
-nlon       = np.arange(0,nlon)
-
-if coords2D:
-    coordsxy = dict(nlat=nlat,nlon=nlon)
+if calc_acf:
+    lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
+    tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
+    acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
+    acf_mon_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Actual ACF
     
-    da_TLONG = xr.DataArray(ds_temp.TLONG,coords=coordsxy,dims=coordsxy,name="TLONG")
-    da_TLAT  = xr.DataArray(ds_temp.TLAT,coords=coordsxy,dims=coordsxy,name="TLAT")
+    for o in tqdm.tqdm(range(nlon)):
+        for a in range(nlat):
+            
+            # Retrieve variable at point
+            varpt = dtvar_yrmon[:,:,:,a,o].copy() # Yr x Mon x Depth
+            if np.all(np.isnan(varpt)):
+                continue # Skip the Point because it is on land
+            
+            # Debugging ====
+            #plt.pcolormesh(np.arange(nyr),dtvar_anom.depth,varpt[:,0,:].T,vmin=-1.5,vmax=1.5,cmap='RdBu_r'),plt.colorbar()
+            
+            depthsum = np.sum(varpt,(0,1))
+            idnan_z  = np.where(np.isnan(depthsum))[0]
+            varpt[:,:,idnan_z] = 0 # Set to Zeros
+            
+            
+            # Retrieve Mixed layer depth cycle at a point
+            if coords2D:
+                lonf = lon[a,o]
+                latf = lat[a,o]
+            else:
+                lonf = lon[o]
+                latf = lat[a]
+            if lon360_flag and lonf > 180:
+                print("Converting Longitude to degrees West")
+                lonf = lonf - 360
+            
+            if mld2d:
+                hpt  = proc.find_tlatlon(ds_mld,lonf,latf,verbose=False).mld
+            else:
+                hpt  = ds_mld.sel(lon=lonf,lat=latf,method='nearest').values#[month]
+            if np.any(np.isnan(hpt)):
+                continue
+            
+            # Section here is taken from calc_detrainemtn_damping_pt -------------
+            # Input Data
+            ts_monyr     = varpt.transpose(1,0,2)        # Anomalies [mon x yr x otherpts (z)]
+            hclim        = hpt                           # MLD Cycle [mon]
+            
+            # (1) Estimate ACF
+            acfs_mon = calc_acf_ens(ts_monyr,lags) # [mon x lag x depth]
+            acfs_mon[:,:,idnan_z] = 0 # To Avoid throwing an error
+            
+            # (2) Fit Exponential Func
+            tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
+            
+            # (3) Compute Detraiment dmaping
+            kprev,_ = scm.find_kprev(hclim)
+            lbd_d   = scm.calc_tau_detrain(hclim,kprev,z,tau_est,debug=False)
+            
+            # Correct zeros back to nans
+            acfs_mon[:,:,idnan_z] = np.nan
+            tau_est[:,idnan_z] = np.nan
+            acf_est[:,:,idnan_z] = np.nan
+            
+            # Save Output
+            lbd_d_all[:,a,o]       = lbd_d.copy()
+            tau_est_all[:,:,a,o]   = tau_est.copy()
+            acf_est_all[:,:,:,a,o] = acf_est.copy()
+            acf_mon_all[:,:,:,a,o] = acfs_mon.copy()
+            
+    #%% Check the output
     
-    # Make data arrays
-    lcoords    = dict(mon=mons,lat=nlat,lon=nlon)
-    da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
     
-    taucoords  = dict(mon=mons,z_t=z,lat=nlat,lon=nlon)
-    da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+    mons       = np.arange(1,13,1)
+    nlat       = np.arange(0,nlat)
+    nlon       = np.arange(0,nlon)
     
-    acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=nlat,lon=nlon)
-    da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
-    da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+    if coords2D:
+        coordsxy = dict(nlat=nlat,nlon=nlon)
+        
+        da_TLONG = xr.DataArray(ds_temp.TLONG,coords=coordsxy,dims=coordsxy,name="TLONG")
+        da_TLAT  = xr.DataArray(ds_temp.TLAT,coords=coordsxy,dims=coordsxy,name="TLAT")
+        
+        # Make data arrays
+        lcoords    = dict(mon=mons,lat=nlat,lon=nlon)
+        da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
+        
+        taucoords  = dict(mon=mons,z_t=z,lat=nlat,lon=nlon)
+        da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+        
+        acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=nlat,lon=nlon)
+        da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
+        da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+        
+        ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_TLONG,da_TLAT])
+        
+    else: # 1-D coorindates Case (EN4)
+        
+        # Make data arrays
+        lcoords    = dict(mon=mons,lat=lat,lon=lon)
+        da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
     
-    ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_TLONG,da_TLAT])
+        taucoords  = dict(mon=mons,z_t=z,lat=lat,lon=lon)
+        da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
     
-else: # 1-D coorindates Case (EN4)
+        acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=lat,lon=lon)
+        da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
+        da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+        
+        ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,])
     
-    # Make data arrays
-    lcoords    = dict(mon=mons,lat=lat,lon=lon)
-    da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
+    
+    edict      = proc.make_encoding_dict(ds_out)
+    savename   = "%s%s_%s_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,mldname,
+                                                                           'TEMP',detrend,lagmax,tstr)
+    ds_out.to_netcdf(savename,encoding=edict)
 
-    taucoords  = dict(mon=mons,z_t=z,lat=lat,lon=lon)
-    da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
-
-    acfcoords  = dict(mon=mons,lag=lags,z_t=z,lat=lat,lon=lon)
-    da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
-    da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+else:
+    print("Loading ACF")
+    savename   = "%s%s_%s_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,mldname,
+                                                                           'TEMP',detrend,lagmax,tstr)
+    ds_out = xr.open_dataset(savename).load()
     
-    ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,])
+    
+    mons       = np.arange(1,13,1)
+    if coords2D:
+        coordsxy = dict(nlat=nlat,nlon=nlon)
+        
+        da_TLONG = xr.DataArray(ds_temp.TLONG,coords=coordsxy,dims=coordsxy,name="TLONG")
+        da_TLAT  = xr.DataArray(ds_temp.TLAT,coords=coordsxy,dims=coordsxy,name="TLAT")
+        
+        # Make data arrays
+        lcoords    = dict(mon=mons,lat=nlat,lon=nlon)
+        
 
-
-edict      = proc.make_encoding_dict(ds_out)
-savename   = "%s%s_%s_lbd_d_params_%s_detrend%s_lagmax%i_%s.nc" % (mimocpath,dataset_name,mldname,
-                                                                       'TEMP',detrend,lagmax,tstr)
-ds_out.to_netcdf(savename,encoding=edict)
+        
+    else: # 1-D coorindates Case (EN4)
+        
+        # Make data arrays
+        lcoords    = dict(mon=mons,lat=lat,lon=lon)
+    
 
 #%% Use the ACFs to compute the detrainment, correlation based
 # Copied from [calc_detrainment_correlation_pointwise]
@@ -488,7 +531,7 @@ z_t         = ds_temp.depth
 acf_ens     = ds_out.acf_mon
 
 # Note, edited so that dtdepth = True 
-debug       = True
+debug       = False
 
 # Loop for each point
 for a in tqdm.tqdm(range(nlat)):
@@ -524,7 +567,7 @@ for a in tqdm.tqdm(range(nlat)):
         
         for im in range(12):
             detrain_mon = kprev[im]
-            if detrain_mon == 0.:
+            if (detrain_mon == 0.) or np.isnan(detrain_mon):
                 continue # Skip when there is no entrainment
                 
             # Get indices for autocorrelation
@@ -600,6 +643,7 @@ for a in tqdm.tqdm(range(nlat)):
 #%% Save the output (for a variable and ensemble member)
 
 if coords2D:
+    
     nlat       = np.arange(0,nlat)
     nlon       = np.arange(0,nlon)
     coords = dict(mon=np.arange(1,13,1),lat=nlat,lon=nlon)
@@ -614,6 +658,7 @@ edict  = {'lbd_d':{'zlib':True}}
 savename = "%s%s_%s_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_%s.nc" % (mimocpath,dataset_name,mldname,"TEMP",detrend,lagmax,
                                                                                                   interpcorr,detrainceil,imshift,dtdepth,tstr)
 da_out.to_netcdf(savename,encoding=edict)                
+
 
 #%% Check Results
 
